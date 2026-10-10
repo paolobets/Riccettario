@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
-import { formatDuration, totalDuration } from '@/core'
+import { activeDuration, formatDuration, totalDuration } from '@/core'
 import Icon from '../components/Icon'
 
 export default function RecipeList() {
@@ -31,10 +31,13 @@ export default function RecipeList() {
   }, [recipes, query, tag])
 
   if (!recipes) return null
+  const filtering = query.trim() !== '' || tag !== null
 
   return (
     <div className="space-y-4">
+      <h1 className="sr-only">Ricette</h1>
       <label className="relative block">
+        <span className="sr-only">Cerca per titolo o ingrediente</span>
         <Icon name="search" size={18} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
         <input
           type="search"
@@ -45,26 +48,48 @@ export default function RecipeList() {
         />
       </label>
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-2 pb-1">
-          <button className={`chip ${tag === null ? 'ring-2 ring-accent' : ''}`} onClick={() => setTag(null)}>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtra per tag">
+          <button className={`chip-button ${tag === null ? 'bg-accent text-on-accent hover:bg-accent-strong' : ''}`} aria-pressed={tag === null} onClick={() => setTag(null)}>
             tutte
           </button>
           {tags.map((t) => (
-            <button key={t} className={`chip ${tag === t ? 'ring-2 ring-accent' : ''}`} onClick={() => setTag(tag === t ? null : t)}>
+            <button
+              key={t}
+              className={`chip-button ${tag === t ? 'bg-accent text-on-accent hover:bg-accent-strong' : ''}`}
+              aria-pressed={tag === t}
+              onClick={() => setTag(tag === t ? null : t)}
+            >
               {t}
             </button>
           ))}
         </div>
       )}
 
-      {filtered.length === 0 && (
-        <div className="card py-10 text-center text-muted">
-          <Icon name="book" size={40} className="mx-auto mb-3 text-faint" />
-          <p className="font-medium text-fg">Nessuna ricetta trovata.</p>
-          <p className="mt-1 text-sm">Crea la prima a mano o lascia che l'AI la strutturi da un testo o una foto.</p>
-          <div className="mt-3 flex justify-center gap-2">
+      {filtered.length === 0 && recipes.length > 0 && filtering && (
+        <div className="py-10 text-center text-muted">
+          <Icon name="search" size={40} className="mx-auto mb-3 text-muted" />
+          <p className="font-medium text-fg">Nessuna ricetta corrisponde{query.trim() ? ` a «${query.trim()}»` : ''}{tag ? ` con il tag «${tag}»` : ''}.</p>
+          <p className="mt-1 text-sm">Prova con un ingrediente, oppure togli i filtri.</p>
+          <button
+            className="btn-secondary mt-3"
+            onClick={() => {
+              setQuery('')
+              setTag(null)
+            }}
+          >
+            Mostra tutte le ricette
+          </button>
+        </div>
+      )}
+
+      {recipes.length === 0 && (
+        <div className="py-10 text-center text-muted">
+          <Icon name="book" size={40} className="mx-auto mb-3 text-muted" />
+          <p className="font-medium text-fg">Il ricettario è vuoto.</p>
+          <p className="mt-1 text-sm">Scrivi la prima ricetta a mano o lascia che l'AI la strutturi da un testo o una foto.</p>
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
             <Link to="/ricetta/nuova" className="btn-primary">
-              Crea la prima ricetta
+              Scrivi la prima ricetta
             </Link>
             <Link to="/importa" className="btn-secondary">
               <Icon name="sparkles" size={16} /> Importa con l'AI
@@ -75,34 +100,30 @@ export default function RecipeList() {
 
       <ul className="rule divide-y divide-line">
         {filtered.map((r) => {
-          const minutes = totalDuration(r.steps)
+          const total = totalDuration(r.steps)
+          const active = activeDuration(r.steps)
+          const waiting = total - active
           return (
             <li key={r.id}>
-              <Link to={`/ricetta/${r.id}`} className="group -mx-2 block rounded-xl px-2 py-4 transition hover:bg-surface-2">
+              <Link to={`/ricetta/${r.id}`} className="group -mx-2 block rounded-xl px-2 py-4">
                 <h2 className="font-display text-2xl font-medium text-fg group-hover:text-accent-text">{r.title}</h2>
                 {r.description && <p className="mt-1 line-clamp-2 text-sm text-muted">{r.description}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
                   <span className="inline-flex items-center gap-1">
-                    <Icon name="chef" size={14} /> {r.servings} porz.
+                    <Icon name="chef" size={14} /> {r.servings} porzioni
                   </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Icon name="book" size={14} /> {r.ingredients.length} ingr.
-                  </span>
-                  {minutes > 0 && (
+                  {total > 0 && (
                     <span className="inline-flex items-center gap-1">
-                      <Icon name="timer" size={14} /> {formatDuration(minutes)}
+                      <Icon name="timer" size={14} />
+                      {waiting > 0 && active > 0 ? `${formatDuration(active)} ai fornelli, ${formatDuration(waiting)} di attesa` : formatDuration(total)}
                     </span>
                   )}
+                  {r.tags.map((t) => (
+                    <span key={t} className="text-accent-text">
+                      {t}
+                    </span>
+                  ))}
                 </div>
-                {r.tags.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {r.tags.map((t) => (
-                      <span key={t} className="chip">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </Link>
             </li>
           )

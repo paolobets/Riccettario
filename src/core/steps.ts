@@ -19,6 +19,16 @@ export function ingredientIdsInStep(step: Step): string[] {
   return ids
 }
 
+/** Id degli ingredienti citati con la quantità (`{id}`), escludendo i riferimenti al solo nome (`{id|nome}`). */
+export function quantifiedIngredientIdsInStep(step: Step): string[] {
+  const ids: string[] = []
+  for (const m of step.text.matchAll(REF)) {
+    const id = m[1]!
+    if (m[2] === undefined && !ids.includes(id)) ids.push(id)
+  }
+  return ids
+}
+
 /**
  * Spezza il testo del passaggio in segmenti, sostituendo `{id}` con la quantità
  * già riscalata ("350 g di acqua") e `{id|nome}` con il solo nome.

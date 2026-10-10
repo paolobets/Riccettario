@@ -15,7 +15,7 @@
   --line: #dedbd1;
   --fg: #1c1c19;
   --fg-2: #45453f;
-  --muted: #6f6e66;
+  --muted: #65645c;
   --faint: #a3a299;
   --accent: #4d7c0f;
   --accent-strong: #3f6212;
@@ -197,6 +197,9 @@ a:focus-visible {
 }
 @utility chip {
   @apply inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-text;
+}
+@utility chip-button {
+  @apply chip min-h-8 px-3 py-1.5 text-sm transition hover:bg-surface-3 disabled:opacity-50;
 }
 @utility section-title {
   @apply font-display text-xl font-semibold text-fg;

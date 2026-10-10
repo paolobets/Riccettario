@@ -2,7 +2,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { deleteRecipe, duplicateRecipe } from '@/data/repo'
-import { activeDuration, formatDuration, STEP_TYPE_LABELS, totalDuration, type Step } from '@/core'
+import { activeDuration, formatDuration, STEP_TYPE_LABELS, totalDuration } from '@/core'
 import { useScaler } from '../hooks/useScaler'
 import ScalerPanel from '../components/ScalerPanel'
 import IngredientList from '../components/IngredientList'
@@ -10,39 +10,35 @@ import StepText from '../components/StepText'
 import TimerButton from '../components/TimerButton'
 import AiPanel from '../components/AiPanel'
 import Icon from '../components/Icon'
+import NotFound from './NotFound'
 
-function groupSteps(steps: Step[]): Array<[string | undefined, Step[]]> {
-  const map = new Map<string | undefined, Step[]>()
-  for (const s of steps) {
-    const list = map.get(s.section) ?? []
-    list.push(s)
-    map.set(s.section, list)
-  }
-  return [...map.entries()]
+function Stars({ rating }: { rating: number }) {
+  return (
+    <span className="inline-flex items-center gap-0.5 text-warning" role="img" aria-label={`${rating} stelle su 5`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Icon key={n} name="star" size={14} fill={n <= rating ? 'currentColor' : 'none'} />
+      ))}
+    </span>
+  )
 }
 
 export default function RecipeView() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const recipe = useLiveQuery(() => (id ? db.recipes.get(id) : undefined), [id])
-  const sessions = useLiveQuery(() => (id ? db.sessions.where('recipeId').equals(id).reverse().sortBy('startedAt') : []), [id])
-  const scaler = useScaler(recipe)
+  // `undefined` mentre carica, `null` se la ricetta non esiste: così la pagina non resta vuota.
+  const recipe = useLiveQuery(async () => (id ? ((await db.recipes.get(id)) ?? null) : null), [id])
+  const sessions = useLiveQuery(
+    () => (id ? db.sessions.where('recipeId').equals(id).filter((s) => Boolean(s.finishedAt)).reverse().sortBy('startedAt') : []),
+    [id],
+  )
+  const scaler = useScaler(recipe ?? undefined)
 
   if (recipe === undefined) return null
-  if (recipe === null || !scaler.scaled) {
-    return (
-      <div className="card text-center">
-        <p>Ricetta non trovata.</p>
-        <Link to="/" className="btn-ghost mt-2">
-          Torna all'elenco
-        </Link>
-      </div>
-    )
-  }
+  if (recipe === null || !scaler.scaled) return <NotFound what="ricetta" />
   const scaled = scaler.scaled
   const total = totalDuration(recipe.steps)
   const active = activeDuration(recipe.steps)
-  let stepNumber = 0
+  const cookLink = `/ricetta/${recipe.id}/cucina${scaler.search ? `?${scaler.search}` : ''}`
 
   return (
     <article className="space-y-5">
@@ -50,12 +46,13 @@ export default function RecipeView() {
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-4xl font-medium leading-tight text-fg">{recipe.title}</h1>
           <div className="flex shrink-0 gap-1">
-            <Link to={`/ricetta/${recipe.id}/modifica`} className="btn-ghost px-2 py-1 text-sm" aria-label="Modifica">
+            <Link to={`/ricetta/${recipe.id}/modifica`} className="btn-ghost min-h-10 px-2 py-1.5 text-sm" aria-label="Modifica">
               <Icon name="edit" size={16} />
               <span className="hidden sm:inline">Modifica</span>
             </Link>
             <button
-              className="btn-ghost px-2 py-1 text-sm"
+              className="btn-ghost min-h-10 px-2 py-1.5 text-sm"
+              aria-label="Duplica"
               onClick={async () => {
                 const copy = await duplicateRecipe(recipe)
                 navigate(`/ricetta/${copy.id}/modifica`)
@@ -65,10 +62,10 @@ export default function RecipeView() {
               <span className="hidden sm:inline">Duplica</span>
             </button>
             <button
-              className="btn-ghost px-2 py-1 text-sm text-danger"
+              className="btn-ghost min-h-10 px-2 py-1.5 text-sm text-danger"
               aria-label="Elimina"
               onClick={async () => {
-                if (confirm(`Eliminare "${recipe.title}"?`)) {
+                if (confirm(`Eliminare "${recipe.title}"? Spariscono anche diario e conversazioni; non si può annullare.`)) {
                   await deleteRecipe(recipe.id)
                   navigate('/')
                 }
@@ -83,8 +80,11 @@ export default function RecipeView() {
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
           {total > 0 && (
             <span className="inline-flex items-center gap-1">
-              <Icon name="timer" size={14} /> {formatDuration(total)}
-              {active > 0 && active !== total && <span>, di cui {formatDuration(active)} ai fornelli</span>}
+              <Icon name="timer" size={14} />
+              <span>
+                {formatDuration(total)}
+                {active > 0 && active !== total ? `, di cui ${formatDuration(active)} ai fornelli` : ''}
+              </span>
             </span>
           )}
           {recipe.tags.map((t) => (
@@ -95,7 +95,7 @@ export default function RecipeView() {
         </div>
       </header>
 
-      <Link to={`/ricetta/${recipe.id}/cucina${scaler.search ? `?${scaler.search}` : ''}`} className="btn-primary w-full py-3 text-lg">
+      <Link to={cookLink} className="btn-primary w-full py-3 text-lg">
         <Icon name="chef" size={22} /> Cucina passo per passo
       </Link>
 
@@ -117,42 +117,41 @@ export default function RecipeView() {
 
       <section className="rule pt-4">
         <h2 className="section-title mb-3">Preparazione</h2>
-        <div className="space-y-5">
-          {groupSteps(recipe.steps).map(([section, steps]) => (
-            <div key={section ?? '_'}>
-              {section && <h3 className="mb-2 text-sm font-semibold text-accent-text">{section}</h3>}
-              <ol className="space-y-4">
-                {steps.map((step) => {
-                  stepNumber += 1
-                  return (
-                    <li key={step.id} className="flex gap-3">
-                      <span className="qty flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-on-accent">{stepNumber}</span>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <StepText step={step} scaled={scaled} className="text-[17px] leading-relaxed" />
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                          {step.type && <span className="chip">{STEP_TYPE_LABELS[step.type]}</span>}
-                          {step.durationMin && <span>{formatDuration(step.durationMin)}</span>}
-                          {step.temperatureC && <span>{step.temperatureC} °C</span>}
-                          {step.equipment?.map((e) => (
-                            <span key={e} className="inline-flex items-center gap-1">
-                              <Icon name="pan" size={13} /> {e}
-                            </span>
-                          ))}
-                          {step.timer && <TimerButton recipeId={recipe.id} stepId={step.id} timer={step.timer} />}
-                          {step.parallelWith && (
-                            <span className="chip bg-info-soft text-info">
-                              <Icon name="parallel" size={12} /> durante il passo {recipe.steps.findIndex((s) => s.id === step.parallelWith) + 1}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ol>
-            </div>
-          ))}
-        </div>
+        <ol className="space-y-4">
+          {recipe.steps.map((step, index) => {
+            // Il titolo di sezione compare quando cambia, senza riordinare i passaggi.
+            const newSection = step.section && step.section !== recipe.steps[index - 1]?.section
+            return (
+              <li key={step.id} className="space-y-2">
+                {newSection && <h3 className={`text-sm font-semibold text-accent-text ${index > 0 ? 'pt-2' : ''}`}>{step.section}</h3>}
+                <div className="flex gap-3">
+                  <span className="qty flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-on-accent" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <StepText step={step} scaled={scaled} className="text-[17px] leading-relaxed" />
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                      {step.type && step.type !== 'prep' && <span className="chip">{STEP_TYPE_LABELS[step.type]}</span>}
+                      {step.durationMin && !step.timer && <span>{formatDuration(step.durationMin)}</span>}
+                      {step.temperatureC && <span>{step.temperatureC} °C</span>}
+                      {step.equipment?.map((e) => (
+                        <span key={e} className="inline-flex items-center gap-1">
+                          <Icon name="pan" size={13} /> {e}
+                        </span>
+                      ))}
+                      {step.timer && <TimerButton recipeId={recipe.id} stepId={step.id} timer={step.timer} />}
+                      {step.parallelWith && (
+                        <span className="chip bg-info-soft text-info">
+                          <Icon name="parallel" size={12} /> durante il passo {recipe.steps.findIndex((s) => s.id === step.parallelWith) + 1}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ol>
       </section>
 
       {recipe.notes && (
@@ -171,9 +170,9 @@ export default function RecipeView() {
                 <div className="flex flex-wrap items-center gap-2 text-muted">
                   <span>{new Date(s.startedAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                   <span className="chip">×{Math.round(s.factor * 100) / 100}</span>
-                  {s.rating ? <span className="text-warning">{'★'.repeat(s.rating)}{'☆'.repeat(5 - s.rating)}</span> : null}
+                  {s.rating ? <Stars rating={s.rating} /> : null}
                 </div>
-                {s.notes && <p>{s.notes}</p>}
+                {s.notes && <p className="text-fg">{s.notes}</p>}
               </li>
             ))}
           </ul>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import Icon from './Icon'
 import { formatFactor, isFactorFeasible, suggestFeasibleFactors, type Recipe, type ScaledRecipe } from '@/core'
 
@@ -11,21 +11,31 @@ interface Props {
   onReset: () => void
 }
 
+/** La resa totale ha senso come comando solo se è una massa, un volume o un numero di pezzi > 1. */
+function yieldIsEditable(recipe: Recipe): boolean {
+  if (!recipe.yield) return false
+  return /^(g|kg|ml|l)$/i.test(recipe.yield.unit.trim()) || recipe.yield.amount > 1
+}
+
 export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFactor, onReset }: Props) {
   const [yieldInput, setYieldInput] = useState('')
+  const servingsId = useId()
+  const yieldId = useId()
   const servings = Math.round(scaled.servings * 100) / 100
   const feasible = isFactorFeasible(recipe, scaled.factor)
   const suggestions = feasible ? [] : suggestFeasibleFactors(recipe, scaled.factor).slice(0, 2)
   const isScaled = Math.abs(scaled.factor - 1) > 1e-9
 
   return (
-    <section className="card space-y-3">
+    <section className="card space-y-3" aria-labelledby={`${servingsId}-title`}>
       <div className="flex items-center justify-between">
-        <h2 className="section-title text-lg">Dosi</h2>
+        <h2 id={`${servingsId}-title`} className="section-title text-lg">
+          Dosi
+        </h2>
         <div className="flex items-center gap-2">
           <span className={`chip ${isScaled ? '' : 'opacity-60'}`}>{formatFactor(scaled.factor)}</span>
           {isScaled && (
-            <button className="btn-ghost px-2 py-1 text-sm" onClick={onReset}>
+            <button className="btn-ghost min-h-9 px-2 py-1 text-sm" onClick={onReset}>
               Ripristina
             </button>
           )}
@@ -33,27 +43,30 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
       </div>
 
       <div className="flex items-center gap-3">
-        <span className="w-24 text-sm text-muted">Porzioni</span>
-        <button className="btn-secondary h-10 w-10 p-0 text-xl" onClick={() => onServings(Math.max(1, Math.round(servings) - 1))} aria-label="Meno porzioni">
+        <label htmlFor={servingsId} className="w-24 text-sm text-muted">
+          Porzioni
+        </label>
+        <button className="btn-secondary h-11 w-11 p-0 text-xl" onClick={() => onServings(Math.max(1, Math.round(servings) - 1))} aria-label="Meno porzioni">
           −
         </button>
         <input
+          id={servingsId}
           type="number"
           min={1}
           step="any"
-          className="w-20 text-center text-lg font-semibold"
+          className="qty h-11 w-20 text-center text-xl font-semibold"
           value={servings}
           onChange={(e) => {
             const n = Number(e.target.value)
             if (n > 0) onServings(n)
           }}
         />
-        <button className="btn-secondary h-10 w-10 p-0 text-xl" onClick={() => onServings(Math.round(servings) + 1)} aria-label="Più porzioni">
+        <button className="btn-secondary h-11 w-11 p-0 text-xl" onClick={() => onServings(Math.round(servings) + 1)} aria-label="Più porzioni">
           +
         </button>
       </div>
 
-      {recipe.yield && (
+      {recipe.yield && yieldIsEditable(recipe) && (
         <form
           className="flex items-center gap-3"
           onSubmit={(e) => {
@@ -63,25 +76,31 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
             setYieldInput('')
           }}
         >
-          <span className="w-24 text-sm text-muted">Resa totale</span>
-          <input
-            type="number"
-            min={0}
-            step="any"
-            className="w-28"
-            placeholder={String(Math.round(scaled.yield!.amount * 100) / 100)}
-            value={yieldInput}
-            onChange={(e) => setYieldInput(e.target.value)}
-          />
-          <span className="text-sm text-muted">{recipe.yield.unit}</span>
-          <button className="btn-secondary px-3 py-1.5 text-sm" type="submit" disabled={!yieldInput}>
+          <label htmlFor={yieldId} className="w-24 shrink-0 text-sm text-muted">
+            Resa totale
+          </label>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <input
+              id={yieldId}
+              type="number"
+              min={0}
+              step="any"
+              className="w-24 min-w-0"
+              placeholder={String(Math.round(scaled.yield!.amount * 100) / 100)}
+              value={yieldInput}
+              onChange={(e) => setYieldInput(e.target.value)}
+            />
+            <span className="truncate text-sm text-muted">{recipe.yield.unit}</span>
+          </div>
+          <button className="btn-secondary min-h-9 px-3 py-1.5 text-sm" type="submit" disabled={!yieldInput}>
             Applica
           </button>
         </form>
       )}
 
-      <p className="text-xs text-muted">
-        Oppure tocca la quantità di un ingrediente qui sotto e scrivi quanto ne hai: il resto si adatta.
+      <p className="inline-flex items-start gap-1.5 text-xs text-muted">
+        <Icon name="edit" size={14} className="mt-0.5" />
+        <span>Tocca una quantità qui sotto e scrivi quanto ne hai: il resto si adatta.</span>
       </p>
 
       {suggestions.length > 0 && (
@@ -91,7 +110,7 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
             {suggestions.map((s) => {
               const name = recipe.ingredients.find((i) => i.id === s.ingredientId)?.name ?? s.ingredientId
               return (
-                <button key={`${s.ingredientId}-${s.count}`} className="btn-secondary px-3 py-1 text-sm" onClick={() => onFactor(s.factor)}>
+                <button key={`${s.ingredientId}-${s.count}`} className="btn-secondary min-h-9 px-3 py-1 text-sm" onClick={() => onFactor(s.factor)}>
                   {s.count} {name} ({formatFactor(s.factor)})
                 </button>
               )

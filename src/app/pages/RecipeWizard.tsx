@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { db } from '@/data/db'
 import { saveRecipe } from '@/data/repo'
 import {
@@ -8,6 +8,7 @@ import {
   slugify,
   STEP_TYPE_LABELS,
   UNITS,
+  formatQuantity,
   formatUnit,
   scaleRecipe,
   type Ingredient,
@@ -169,6 +170,7 @@ export default function RecipeWizard() {
   const [draft, setDraft] = useState<Draft | null>(id ? null : fromRecipe(prefill.recipe ?? { ...emptyRecipe(), ingredients: [], steps: [] }))
   const [base, setBase] = useState<Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>>(() => (prefill.recipe ? { id: prefill.recipe.id, createdAt: prefill.recipe.createdAt, updatedAt: prefill.recipe.updatedAt } : emptyRecipe()))
   const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(Boolean(prefill.recipe))
 
   useEffect(() => {
     if (!id) return
@@ -181,7 +183,14 @@ export default function RecipeWizard() {
   }, [id, navigate])
 
   if (!draft) return null
-  const set = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch })
+  const set = (patch: Partial<Draft>) => {
+    setDraft({ ...draft, ...patch })
+    setDirty(true)
+  }
+  const cancel = () => {
+    if (dirty && !confirm('Scartare le modifiche? Quello che hai scritto in questa scheda andrà perso.')) return
+    navigate(id ? `/ricetta/${id}` : '/')
+  }
 
   const canNext = phase === 0 ? draft.title.trim().length > 0 && (num(draft.servings) ?? 0) > 0 : phase === 1 ? draft.ingredients.some((i) => i.name.trim()) : true
 
@@ -195,10 +204,10 @@ export default function RecipeWizard() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-fg">{id ? 'Modifica ricetta' : prefill.fromAi ? 'Ricetta importata' : 'Nuova ricetta'}</h1>
-        <Link to={id ? `/ricetta/${id}` : '/'} className="btn-ghost px-2 py-1 text-sm">
+        <h1 className="text-3xl font-medium text-fg">{id ? 'Modifica ricetta' : prefill.fromAi ? 'Ricetta importata' : 'Nuova ricetta'}</h1>
+        <button className="btn-ghost min-h-10 px-2 py-1 text-sm" onClick={cancel}>
           Annulla
-        </Link>
+        </button>
       </div>
       {prefill.fromAi && (
         <div className="notice bg-info-soft text-info">
@@ -213,26 +222,32 @@ export default function RecipeWizard() {
           ))}
         </div>
       )}
-      <ol className="flex gap-1 text-xs">
-        {PHASES.map((p, i) => (
-          <li key={p} className="flex-1">
-            <button
-              className={`w-full rounded-full px-2 py-1 transition ${i === phase ? 'bg-accent text-on-accent' : i < phase || prefill.fromAi ? 'bg-accent-soft text-accent-text' : 'bg-surface-3 text-muted'}`}
-              onClick={() => (i < phase || prefill.fromAi) && setPhase(i as Phase)}
-              disabled={i > phase && !prefill.fromAi}
-            >
-              {i + 1}. {p}
-            </button>
-          </li>
-        ))}
-      </ol>
+      <nav aria-label="Fasi">
+        <p className="mb-1 text-sm text-muted">
+          Fase {phase + 1} di {PHASES.length}
+        </p>
+        <ol className="flex gap-1 overflow-x-auto text-sm">
+          {PHASES.map((p, i) => (
+            <li key={p} className="shrink-0">
+              <button
+                className={`min-h-9 rounded-full px-3 py-1.5 whitespace-nowrap transition ${i === phase ? 'bg-accent text-on-accent' : i < phase || prefill.fromAi ? 'bg-accent-soft text-accent-text' : 'bg-surface-3 text-muted'}`}
+                onClick={() => (i < phase || prefill.fromAi) && setPhase(i as Phase)}
+                disabled={i > phase && !prefill.fromAi}
+                aria-current={i === phase ? 'step' : undefined}
+              >
+                {p}
+              </button>
+            </li>
+          ))}
+        </ol>
+      </nav>
 
       {phase === 0 && <PhaseInfo draft={draft} set={set} />}
       {phase === 1 && <PhaseIngredients draft={draft} set={set} />}
       {phase === 2 && <PhaseSteps draft={draft} set={set} />}
       {phase === 3 && <PhaseReview recipe={toRecipe(draft, base)} />}
 
-      <div className="flex justify-between gap-3">
+      <div className="flex justify-between gap-3 pt-2">
         <button className="btn-secondary" onClick={() => setPhase((phase - 1) as Phase)} disabled={phase === 0}>
           <Icon name="left" size={16} /> Indietro
         </button>
@@ -321,11 +336,11 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
       </p>
       {draft.ingredients.map((ing, idx) => (
         <div key={ing.id} className="card space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-muted">#{idx + 1}</span>
+          <div className="flex items-center gap-1">
             <input
-              className="flex-1"
+              className="min-w-0 flex-1"
               placeholder="Nome (es. farina 00)"
+              aria-label={`Nome dell'ingrediente ${idx + 1}`}
               value={ing.name}
               autoFocus={!ing.name}
               onChange={(e) => {
@@ -335,9 +350,9 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
                 update(idx, { name, ...(used ? {} : { id: slugify(name) || ing.id }) })
               }}
             />
-            <button className="btn-ghost px-2 py-1" onClick={() => move(idx, -1)} aria-label="Sposta su">↑</button>
-            <button className="btn-ghost px-2 py-1" onClick={() => move(idx, 1)} aria-label="Sposta giù">↓</button>
-            <button className="btn-ghost px-2 py-1 text-danger" onClick={() => remove(idx)} aria-label="Rimuovi"><Icon name="close" size={16} /></button>
+            <button className="btn-ghost h-10 w-9 shrink-0 p-0" onClick={() => move(idx, -1)} disabled={idx === 0} aria-label={`Sposta su ${ing.name || 'ingrediente'}`}><Icon name="up" size={16} /></button>
+            <button className="btn-ghost h-10 w-9 shrink-0 p-0" onClick={() => move(idx, 1)} disabled={idx === draft.ingredients.length - 1} aria-label={`Sposta giù ${ing.name || 'ingrediente'}`}><Icon name="down" size={16} /></button>
+            <button className="btn-ghost h-10 w-9 shrink-0 p-0 text-danger" onClick={() => remove(idx)} aria-label={`Rimuovi ${ing.name || 'ingrediente'}`}><Icon name="close" size={16} /></button>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <input
@@ -346,11 +361,13 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
               step="any"
               min={0}
               placeholder="Quantità"
+              aria-label="Quantità"
+              className="min-w-0"
               value={ing.amount}
               disabled={ing.mode === 'toTaste'}
               onChange={(e) => update(idx, { amount: e.target.value })}
             />
-            <select value={ing.unit} disabled={ing.mode === 'toTaste'} onChange={(e) => update(idx, { unit: e.target.value as Unit })}>
+            <select className="min-w-0" aria-label="Unità" value={ing.unit} disabled={ing.mode === 'toTaste'} onChange={(e) => update(idx, { unit: e.target.value as Unit })}>
               {UNITS.filter((u) => u !== 'q.b.').map((u) => (
                 <option key={u} value={u}>
                   {u === '' ? '(nessuna: pezzi)' : formatUnit(u, 1)}
@@ -358,7 +375,8 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
               ))}
             </select>
             <select
-              className="col-span-2"
+              className="col-span-2 min-w-0"
+              aria-label="Regola di scalatura"
               value={ing.mode}
               onChange={(e) => {
                 const mode = e.target.value as ScalingMode
@@ -374,8 +392,8 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
           </div>
           {ing.mode === 'bakersPercent' && (
             <div className="grid grid-cols-2 gap-2">
-              <input type="number" inputMode="decimal" step="any" min={0} placeholder="% (es. 65)" value={ing.percent} onChange={(e) => update(idx, { percent: e.target.value })} />
-              <select value={ing.of} onChange={(e) => update(idx, { of: e.target.value })}>
+              <input type="number" inputMode="decimal" step="any" min={0} placeholder="% (es. 65)" aria-label="Percentuale" className="min-w-0" value={ing.percent} onChange={(e) => update(idx, { percent: e.target.value })} />
+              <select className="min-w-0" aria-label="Ingrediente di riferimento" value={ing.of} onChange={(e) => update(idx, { of: e.target.value })}>
                 <option value="">rispetto a…</option>
                 {massIngredients.filter((m) => m.id !== ing.id).map((m) => (
                   <option key={m.id} value={m.id}>
@@ -386,10 +404,10 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
             </div>
           )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <input placeholder="Nota (es. a cubetti)" value={ing.note} onChange={(e) => update(idx, { note: e.target.value })} />
-            <input placeholder="Sezione (es. Impasto)" value={ing.section} onChange={(e) => update(idx, { section: e.target.value })} list="sections" />
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="h-4 w-4 accent-accent" checked={ing.optional} onChange={(e) => update(idx, { optional: e.target.checked })} />
+            <input placeholder="Nota (es. a cubetti)" aria-label="Nota" className="min-w-0" value={ing.note} onChange={(e) => update(idx, { note: e.target.value })} />
+            <input placeholder="Sezione (es. Impasto)" aria-label="Sezione" className="min-w-0" value={ing.section} onChange={(e) => update(idx, { section: e.target.value })} list="sections" />
+            <label className="flex min-h-10 items-center gap-2 text-sm">
+              <input type="checkbox" className="h-5 w-5 accent-accent" checked={ing.optional} onChange={(e) => update(idx, { optional: e.target.checked })} />
               facoltativo
             </label>
           </div>
@@ -401,7 +419,7 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
         ))}
       </datalist>
       <button className="btn-secondary w-full" onClick={add}>
-        + Aggiungi ingrediente
+        <Icon name="plus" size={16} /> Aggiungi ingrediente
       </button>
     </section>
   )
@@ -409,6 +427,8 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
 
 function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => void }) {
   const textareas = useRef<Record<string, HTMLTextAreaElement | null>>({})
+  /** Passaggi in cui i bottoni inseriscono solo il nome dell'ingrediente, senza quantità. */
+  const [nameOnly, setNameOnly] = useState<Set<string>>(new Set())
   /** Ultima posizione del cursore per ogni passaggio: il clic sul bottone fa perdere il focus. */
   const carets = useRef<Record<string, number>>({})
   const rememberCaret = (stepId: string, el: HTMLTextAreaElement) => {
@@ -447,25 +467,26 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
   return (
     <section className="space-y-3">
       <p className="text-sm text-muted">
-        Scrivi il passaggio e <b>inserisci gli ingredienti con i bottoni</b>: la quantità comparirà già riscalata quando cucini. Tieni premuto a lungo (o usa "solo nome") per citare l'ingrediente senza quantità.
+        Scrivi il passaggio e <b>inserisci gli ingredienti con i bottoni</b>: la quantità comparirà già riscalata quando cucini. Per citare un ingrediente senza la dose (ad esempio "aggiungi il resto del pecorino") attiva "solo il nome".
       </p>
       {draft.steps.map((step, idx) => (
         <div key={step.id} className="card space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-muted">Passo {idx + 1}</span>
-            <select className="py-1 text-sm" value={step.type} onChange={(e) => update(idx, { type: e.target.value as StepType | '' })}>
-              <option value="">tipo…</option>
+          <div className="flex items-center gap-1">
+            <h3 className="qty flex-1 text-base font-semibold text-fg">Passo {idx + 1}</h3>
+            <button className="btn-ghost h-10 w-9 p-0" onClick={() => move(idx, -1)} disabled={idx === 0} aria-label={`Sposta su il passo ${idx + 1}`}><Icon name="up" size={16} /></button>
+            <button className="btn-ghost h-10 w-9 p-0" onClick={() => move(idx, 1)} disabled={idx === draft.steps.length - 1} aria-label={`Sposta giù il passo ${idx + 1}`}><Icon name="down" size={16} /></button>
+            <button className="btn-ghost h-10 w-9 p-0 text-danger" onClick={() => remove(idx)} aria-label={`Rimuovi il passo ${idx + 1}`}><Icon name="close" size={16} /></button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <select className="min-w-0 py-1.5 text-sm" aria-label="Tipo di passaggio" value={step.type} onChange={(e) => update(idx, { type: e.target.value as StepType | '' })}>
+              <option value="">Tipo di passaggio</option>
               {(Object.keys(STEP_TYPE_LABELS) as StepType[]).map((t) => (
                 <option key={t} value={t}>
                   {STEP_TYPE_LABELS[t]}
                 </option>
               ))}
             </select>
-            <input className="w-32 py-1 text-sm" placeholder="Sezione" value={step.section} onChange={(e) => update(idx, { section: e.target.value })} list="sections" />
-            <span className="flex-1" />
-            <button className="btn-ghost px-2 py-1" onClick={() => move(idx, -1)} aria-label="Sposta su">↑</button>
-            <button className="btn-ghost px-2 py-1" onClick={() => move(idx, 1)} aria-label="Sposta giù">↓</button>
-            <button className="btn-ghost px-2 py-1 text-danger" onClick={() => remove(idx)} aria-label="Rimuovi"><Icon name="close" size={16} /></button>
+            <input className="min-w-0 py-1.5 text-sm" placeholder="Sezione (es. Crema)" aria-label="Sezione" value={step.section} onChange={(e) => update(idx, { section: e.target.value })} list="sections" />
           </div>
           <textarea
             ref={(el) => {
@@ -474,6 +495,7 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
             className="w-full"
             rows={3}
             placeholder="Es. Sciogli {lievito} in {acqua} tiepida…"
+            aria-label={`Testo del passo ${idx + 1}`}
             value={step.text}
             autoFocus={!step.text}
             onChange={(e) => {
@@ -485,29 +507,45 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
             onClick={(e) => rememberCaret(step.id, e.currentTarget)}
             onBlur={(e) => rememberCaret(step.id, e.currentTarget)}
           />
-          <div className="flex flex-wrap gap-1">
-            {ingredients.map((i) => (
-              <span key={i.id} className="inline-flex overflow-hidden rounded-full border border-line text-xs">
-                <button className="bg-accent-soft px-2 py-0.5 text-accent-text hover:bg-surface-3" onClick={() => insertRef(idx, i.id, false)} title="Inserisci con quantità">
+          {ingredients.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={`Inserisci un ingrediente nel passo ${idx + 1}`}>
+              {ingredients.map((i) => (
+                <button
+                  key={i.id}
+                  className={`chip-button ${nameOnly.has(step.id) ? 'bg-surface-2 text-fg' : ''}`}
+                  onClick={() => insertRef(idx, i.id, nameOnly.has(step.id))}
+                  title={nameOnly.has(step.id) ? 'Inserisce solo il nome' : 'Inserisce nome e quantità'}
+                >
                   {i.name}
                 </button>
-                <button className="bg-surface px-1.5 py-0.5 text-muted hover:bg-surface-2" onClick={() => insertRef(idx, i.id, true)} title="Inserisci solo il nome">
-                  n
-                </button>
-              </span>
-            ))}
-          </div>
+              ))}
+              <label className="ml-auto inline-flex min-h-8 items-center gap-1.5 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-accent"
+                  checked={nameOnly.has(step.id)}
+                  onChange={(e) => {
+                    const next = new Set(nameOnly)
+                    if (e.target.checked) next.add(step.id)
+                    else next.delete(step.id)
+                    setNameOnly(next)
+                  }}
+                />
+                solo il nome
+              </label>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            <input type="number" inputMode="numeric" min={0} placeholder="Durata (min)" value={step.durationMin} onChange={(e) => update(idx, { durationMin: e.target.value })} />
-            <input type="number" inputMode="numeric" min={0} placeholder="°C" value={step.temperatureC} onChange={(e) => update(idx, { temperatureC: e.target.value })} />
-            <input type="number" inputMode="numeric" min={0} placeholder="Timer (min)" value={step.timerMinutes} onChange={(e) => update(idx, { timerMinutes: e.target.value })} />
-            <input placeholder="Nome timer" value={step.timerLabel} onChange={(e) => update(idx, { timerLabel: e.target.value })} />
-            <input placeholder="Attrezzatura" value={step.equipment} onChange={(e) => update(idx, { equipment: e.target.value })} />
+            <input type="number" inputMode="numeric" min={0} className="min-w-0" placeholder="Durata (min)" aria-label="Durata in minuti" value={step.durationMin} onChange={(e) => update(idx, { durationMin: e.target.value })} />
+            <input type="number" inputMode="numeric" min={0} className="min-w-0" placeholder="°C" aria-label="Temperatura in gradi" value={step.temperatureC} onChange={(e) => update(idx, { temperatureC: e.target.value })} />
+            <input type="number" inputMode="numeric" min={0} className="min-w-0" placeholder="Timer (min)" aria-label="Timer in minuti" value={step.timerMinutes} onChange={(e) => update(idx, { timerMinutes: e.target.value })} />
+            <input className="min-w-0" placeholder="Nome timer" aria-label="Nome del timer" value={step.timerLabel} onChange={(e) => update(idx, { timerLabel: e.target.value })} />
+            <input className="min-w-0" placeholder="Attrezzatura" aria-label="Attrezzatura" value={step.equipment} onChange={(e) => update(idx, { equipment: e.target.value })} />
           </div>
           {draft.steps.length > 1 && (
-            <label className="flex items-center gap-2 text-sm text-muted">
+            <label className="flex flex-wrap items-center gap-2 text-sm text-muted">
               <span className="inline-flex items-center gap-1"><Icon name="parallel" size={14} /> Si può fare durante</span>
-              <select className="py-1 text-sm" value={step.parallelWith} onChange={(e) => update(idx, { parallelWith: e.target.value })}>
+              <select className="min-w-0 py-1.5 text-sm" value={step.parallelWith} onChange={(e) => update(idx, { parallelWith: e.target.value })}>
                 <option value="">nessun altro passaggio</option>
                 {draft.steps.map((o, k) =>
                   o.id === step.id ? null : (
@@ -527,7 +565,7 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
         ))}
       </datalist>
       <button className="btn-secondary w-full" onClick={add}>
-        + Aggiungi passaggio
+        <Icon name="plus" size={16} /> Aggiungi passaggio
       </button>
       {unused.length > 0 && draft.steps.length > 0 && (
         <p className="text-xs text-warning">Ingredienti non ancora citati in nessun passaggio: {unused.map((i) => i.name).join(', ')}.</p>
@@ -559,41 +597,57 @@ function PhaseReview({ recipe }: { recipe: Recipe }) {
           ))}
         </div>
       )}
-      <div className="card">
-        <h2 className="text-xl font-bold text-fg">{recipe.title}</h2>
+      <div>
+        <h2 className="text-2xl font-medium text-fg">{recipe.title || 'Senza titolo'}</h2>
         <p className="text-sm text-muted">
           {recipe.servings} porzioni, {recipe.ingredients.length} ingredienti, {recipe.steps.length} passaggi
         </p>
       </div>
-      <div className="card">
-        <h3 className="mb-2 font-semibold">Prova di scalatura: ×2</h3>
+      <section className="rule pt-3">
+        <h3 className="section-title text-lg">Prova di scalatura ×2</h3>
         <p className="mb-2 text-xs text-muted">Controlla che le regole scelte diano quantità sensate.</p>
         <table className="w-full text-sm">
+          <thead className="text-xs text-muted">
+            <tr>
+              <th scope="col" className="py-1 text-left font-normal">
+                Ingrediente
+              </th>
+              <th scope="col" className="py-1 text-right font-normal">
+                ×1
+              </th>
+              <th scope="col" className="py-1 text-right font-normal">
+                ×2
+              </th>
+            </tr>
+          </thead>
           <tbody>
             {scaled.ingredients.map((i) => {
               const d = doubled.byId.get(i.id)
               return (
-                <tr key={i.id} className="border-t border-line">
-                  <td className="py-1">{i.name}</td>
-                  <td className="py-1 text-right text-muted">{i.scaled ? `${Math.round(i.scaled.amount * 100) / 100} ${i.scaled.unit}` : '—'}</td>
-                  <td className="py-1 text-right font-semibold">{d?.scaled ? `${Math.round(d.scaled.amount * 100) / 100} ${d.scaled.unit}` : '—'}</td>
-                  <td className="py-1 pl-2 text-xs text-faint">{SCALING_MODE_LABELS[i.scaling?.mode ?? 'linear']}</td>
+                <tr key={i.id} className="border-t border-line align-top">
+                  <td className="py-1.5 pr-2">
+                    {i.name}
+                    <span className="block text-xs text-muted">{SCALING_MODE_LABELS[i.scaling?.mode ?? 'linear']}</span>
+                  </td>
+                  <td className="qty py-1.5 pl-2 text-right text-muted">{i.scaled ? formatQuantity(i.scaled) : '—'}</td>
+                  <td className="qty py-1.5 pl-3 text-right font-semibold">{d?.scaled ? formatQuantity(d.scaled) : '—'}</td>
                 </tr>
               )
             })}
           </tbody>
         </table>
-      </div>
-      <div className="card space-y-2">
-        <h3 className="font-semibold">Passaggi</h3>
-        <ol className="list-inside list-decimal space-y-1 text-sm">
-          {recipe.steps.map((s) => (
-            <li key={s.id}>
-              <StepText step={s} scaled={scaled} className="inline" />
+      </section>
+      <section className="rule space-y-2 pt-3">
+        <h3 className="section-title text-lg">Passaggi</h3>
+        <ol className="space-y-2 text-sm">
+          {recipe.steps.map((s, i) => (
+            <li key={s.id} className="flex gap-2">
+              <span className="qty w-5 shrink-0 text-right text-muted">{i + 1}</span>
+              <StepText step={s} scaled={scaled} as="span" className="min-w-0 flex-1" />
             </li>
           ))}
         </ol>
-      </div>
+      </section>
     </section>
   )
 }

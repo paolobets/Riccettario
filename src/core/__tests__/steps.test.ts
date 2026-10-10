@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { scaleRecipe } from '../scaling'
-import { ingredientIdsInStep, parallelStepsFor, renderStep, renderStepPlain, totalDuration } from '../steps'
+import { ingredientIdsInStep, parallelStepsFor, quantifiedIngredientIdsInStep, renderStep, renderStepPlain, totalDuration } from '../steps'
 import { pane } from './fixtures'
 
 describe('steps', () => {
   it('estrae gli id citati', () => {
     expect(ingredientIdsInStep(pane.steps[0]!)).toEqual(['farina', 'acqua', 'sale'])
+  })
+  it('distingue i riferimenti con quantità da quelli al solo nome', () => {
+    const step = { id: 'x', text: 'Unisci {farina} al {sale|nome}, poi ancora {farina} e {acqua|}.' }
+    expect(quantifiedIngredientIdsInStep(step)).toEqual(['farina'])
+    expect(ingredientIdsInStep(step)).toEqual(['farina', 'sale', 'acqua'])
   })
   it('rende le quantità riscalate nel testo', () => {
     const r = scaleRecipe(pane, 2)

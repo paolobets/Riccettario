@@ -1,6 +1,21 @@
 # Analisi UI/UX, terza revisione
 
-Stato al 10 ottobre 2026, dopo le due revisioni grafiche già in `main`. L'analisi si basa sul codice di `src/app` e su screenshot dell'app compilata a larghezza telefono (390 px, tema chiaro e scuro) e desktop (1024 px), con le tre ricette di esempio. Ogni voce indica il file da toccare.
+Stato al 10 ottobre 2026, dopo le due revisioni grafiche già in `main`.
+
+## Stato dei rilievi
+
+Terza revisione applicata (branch `docs/analisi-ui-ux`), verificata con gli stessi screenshot e le stesse misure Playwright della diagnosi.
+
+Risolto: tutti e sei i difetti bloccanti; dei difetti medi tutti tranne il salto diretto a un passaggio, che ora c'è ma come menu a tendina nativo su "Passo N di M"; dell'audit di accessibilità i 14 punti (il colore `faint` resta per segnaposto e decorazioni, `muted` è stato scurito a 5,2:1 su `surface-2`); dei "tell" di frontend-design la dissolvenza a ogni pagina, le card in Impostazioni e nel riepilogo del wizard, il monospazio dei timer, i numeri `#1` degli ingredienti; dei testi "Finito" è diventato "Concludi", la lista distingue "nessuna ricetta" da "nessun risultato", l'errore di importazione JSON dice cosa fare.
+
+Resta aperto, per scelta o per scope:
+
+- Le tre conferme (elimina ricetta, esci dalla cottura, annulla il wizard) usano ancora `confirm()` del browser: i bottoni non possono nominare l'azione. Da sostituire con un dialogo dell'app quando ce ne sarà un secondo uso.
+- "Spendere l'audacia" sul passaggio in cucina: il corpo è salito a 28 px (36 su tablet) e il testo è ora l'`h1`, ma non è stato fatto un lavoro tipografico più spinto.
+- Le card restano per Dosi, Assistente, mise en place e "In questo passo" (pannelli interattivi, coerenti con CLAUDE.md) e per ogni ingrediente e passaggio del wizard, dove separano moduli ripetuti.
+- Il tempo in lista ora distingue fornelli e attesa; la vista ricetta mantiene "di cui ai fornelli".
+- Le quantità della mise en place restano in colonna a destra con uno spazio vuoto a sinistra sui telefoni stretti.
+ L'analisi si basa sul codice di `src/app` e su screenshot dell'app compilata a larghezza telefono (390 px, tema chiaro e scuro) e desktop (1024 px), con le tre ricette di esempio. Ogni voce indica il file da toccare.
 
 ## Cosa funziona già bene
 

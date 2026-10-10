@@ -4,13 +4,15 @@ interface Props {
   step: Step
   scaled: ScaledRecipe
   className?: string
+  /** Elemento contenitore: `h1` in modalità cucina, dove il passaggio è il titolo della schermata. */
+  as?: 'p' | 'h1' | 'span'
 }
 
 /** Testo del passaggio con le quantità riscalate evidenziate. */
-export default function StepText({ step, scaled, className }: Props) {
+export default function StepText({ step, scaled, className, as: Tag = 'p' }: Props) {
   const segments = renderStep(step, scaled)
   return (
-    <p className={className}>
+    <Tag className={className}>
       {segments.map((s, i) => {
         if (s.kind === 'text') return <span key={i}>{s.text}</span>
         if (s.kind === 'missing')
@@ -29,6 +31,6 @@ export default function StepText({ step, scaled, className }: Props) {
           </span>
         )
       })}
-    </p>
+    </Tag>
   )
 }

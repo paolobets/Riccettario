@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { isAiConfigured, loadAiSettings } from '@/ai/settings'
 import { db } from '@/data/db'
@@ -76,20 +76,26 @@ export default function AiPanel({ recipe, factor }: Props) {
           <Icon name="sparkles" size={16} className="text-accent" /> Assistente
         </h2>
         <div className="flex gap-1 text-sm">
-          <button className={`btn-ghost px-2 py-1 ${!variantMode ? 'bg-accent-soft' : ''}`} onClick={() => setVariantMode(false)}>
+          <button className={`btn-ghost min-h-9 px-2 py-1 ${!variantMode ? 'bg-accent-soft' : ''}`} aria-pressed={!variantMode} onClick={() => setVariantMode(false)}>
             Domande
           </button>
-          <button className={`btn-ghost px-2 py-1 ${variantMode ? 'bg-accent-soft' : ''}`} onClick={() => setVariantMode(true)}>
+          <button className={`btn-ghost min-h-9 px-2 py-1 ${variantMode ? 'bg-accent-soft' : ''}`} aria-pressed={variantMode} onClick={() => setVariantMode(true)}>
             Variante
           </button>
-          <button className="btn-ghost px-2 py-1" onClick={() => setOpen(false)} aria-label="Chiudi">
+          <button className="btn-ghost min-h-9 px-2 py-1" onClick={() => setOpen(false)} aria-label="Chiudi assistente">
             <Icon name="close" size={16} />
           </button>
         </div>
       </div>
 
       {configured === false && (
-        <p className="notice bg-warning-soft text-warning">Configura la chiave API nelle impostazioni per usare l'assistente.</p>
+        <p className="notice bg-warning-soft text-warning">
+          L'assistente non è ancora configurato.{' '}
+          <Link to="/impostazioni" className="underline">
+            Inserisci la chiave API nelle impostazioni
+          </Link>
+          .
+        </p>
       )}
 
       {!variantMode && (
@@ -97,7 +103,7 @@ export default function AiPanel({ recipe, factor }: Props) {
           {chat.turns.length === 0 && chat.partial === null && (
             <div className="flex flex-wrap gap-2">
               {QUICK.map((q) => (
-                <button key={q} className="chip hover:bg-surface-3" onClick={() => ask(q)} disabled={busy || configured === false}>
+                <button key={q} className="chip-button" onClick={() => ask(q)} disabled={busy || configured === false}>
                   {q}
                 </button>
               ))}
@@ -111,13 +117,13 @@ export default function AiPanel({ recipe, factor }: Props) {
               ask(question)
             }}
           >
-            <input className="flex-1" placeholder="Fai una domanda sulla ricetta…" value={question} onChange={(e) => setQuestion(e.target.value)} disabled={busy} />
+            <input className="min-w-0 flex-1" placeholder="Fai una domanda sulla ricetta…" aria-label="Domanda sulla ricetta" value={question} onChange={(e) => setQuestion(e.target.value)} disabled={busy} />
             <button className="btn-primary" type="submit" disabled={busy || !question.trim() || configured === false}>
               {chat.busy ? '…' : 'Invia'}
             </button>
           </form>
           {chat.turns.length > 0 && (
-            <button className="btn-ghost px-2 py-1 text-xs" onClick={chat.reset} disabled={busy}>
+            <button className="btn-ghost min-h-9 px-2 py-1 text-xs" onClick={chat.reset} disabled={busy}>
               Nuova conversazione
             </button>
           )}
@@ -135,6 +141,7 @@ export default function AiPanel({ recipe, factor }: Props) {
             className="w-full"
             rows={3}
             placeholder="Es. versione senza lattosio; oppure: applica le note delle ultime cotture"
+            aria-label="Istruzione per la variante"
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
             disabled={busy}

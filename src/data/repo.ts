@@ -50,6 +50,21 @@ export async function finishSession(id: string, data: { rating?: number; notes?:
   await db.sessions.update(id, { ...data, finishedAt: new Date().toISOString() })
 }
 
+/**
+ * Registra una cottura conclusa in un colpo solo: la modalità cucina la chiama
+ * solo al salvataggio finale, così le cotture abbandonate non lasciano tracce nel diario.
+ */
+export async function recordSession(
+  recipeId: string,
+  factor: number,
+  startedAt: string,
+  data: { rating?: number; notes?: string },
+): Promise<CookSession> {
+  const s: CookSession = { id: newId('s'), recipeId, factor, startedAt, finishedAt: new Date().toISOString(), ...data }
+  await db.sessions.put(s)
+  return s
+}
+
 export async function exportAll(): Promise<string> {
   const recipes = await db.recipes.toArray()
   const sessions = await db.sessions.toArray()

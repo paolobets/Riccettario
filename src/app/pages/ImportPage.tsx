@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { isAiConfigured, loadAiSettings } from '@/ai/settings'
 import Icon from '../components/Icon'
@@ -20,6 +20,10 @@ export default function ImportPage() {
     loadAiSettings().then((s) => setConfigured(isAiConfigured(s)))
   }, [])
 
+  // Anteprime create una volta per file e revocate quando cambiano, per non accumulare blob in memoria.
+  const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files])
+  useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews])
+
   const canRun = mode === 'text' ? text.trim().length > 20 : mode === 'url' ? /^https?:\/\//.test(url.trim()) : files.length > 0
 
   const run = async () => {
@@ -39,7 +43,7 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-fg">Importa con l'AI</h1>
+      <h1 className="text-3xl font-medium text-fg">Importa con l'AI</h1>
       <p className="text-sm text-muted">
         Incolla il testo di una ricetta, fotografa una pagina o indica un indirizzo web. L'AI la trasforma in una ricetta strutturata con le regole di scalatura; poi la rivedi nel wizard prima di salvarla.
       </p>
@@ -54,7 +58,7 @@ export default function ImportPage() {
         </div>
       )}
 
-      <div className="flex gap-1 rounded-xl bg-surface-2 p-1">
+      <div className="flex gap-1 rounded-xl bg-surface-2 p-1" role="group" aria-label="Sorgente">
         {(
           [
             ['text', 'Testo'],
@@ -64,7 +68,8 @@ export default function ImportPage() {
         ).map(([m, label]) => (
           <button
             key={m}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${mode === m ? 'bg-surface text-fg shadow-sm' : 'text-muted'}`}
+            className={`min-h-10 flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${mode === m ? 'bg-surface text-fg shadow-sm' : 'text-muted'}`}
+            aria-pressed={mode === m}
             onClick={() => setMode(m)}
           >
             {label}
@@ -76,6 +81,7 @@ export default function ImportPage() {
         <textarea
           className="w-full"
           rows={12}
+          aria-label="Testo della ricetta"
           placeholder={'Es.\nTorta di mele\nIngredienti per 8: 3 mele, 200 g di farina, 150 g di zucchero, 2 uova…\nPreparazione: …'}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -83,7 +89,7 @@ export default function ImportPage() {
       )}
 
       {mode === 'url' && (
-        <input className="w-full" type="url" placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} />
+        <input className="w-full" type="url" placeholder="https://…" aria-label="Indirizzo web della ricetta" value={url} onChange={(e) => setUrl(e.target.value)} />
       )}
 
       {mode === 'photo' && (
@@ -107,11 +113,11 @@ export default function ImportPage() {
             <ul className="grid grid-cols-3 gap-2">
               {files.map((f, i) => (
                 <li key={`${f.name}-${i}`} className="relative">
-                  <img src={URL.createObjectURL(f)} alt="" className="aspect-square w-full rounded-lg object-cover" />
+                  <img src={previews[i]} alt={`Foto ${i + 1}`} className="aspect-square w-full rounded-lg object-cover" />
                   <button
-                    className="absolute top-1 right-1 rounded-full bg-surface/90 px-2 text-sm"
+                    className="absolute top-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 text-sm"
                     onClick={() => setFiles(files.filter((_, k) => k !== i))}
-                    aria-label="Rimuovi foto"
+                    aria-label={`Rimuovi foto ${i + 1}`}
                   >
                     <Icon name="close" size={14} />
                   </button>

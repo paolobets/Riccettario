@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   formatAmount,
   formatQuantity,
@@ -9,11 +9,14 @@ import {
   type ScaledRecipe,
   type PivotResult,
 } from '@/core'
+import Icon from './Icon'
 
 interface Props {
   scaled: ScaledRecipe
   onPivot?: (ingredientId: string, amountInBaseUnit: number) => PivotResult
   checkable?: boolean
+  /** Se dato, le spunte sopravvivono al ricaricamento della pagina (sessionStorage). */
+  storageKey?: string
 }
 
 function groupBySection(items: ScaledIngredient[]): Array<[string | undefined, ScaledIngredient[]]> {
@@ -26,11 +29,36 @@ function groupBySection(items: ScaledIngredient[]): Array<[string | undefined, S
   return [...map.entries()]
 }
 
-export default function IngredientList({ scaled, onPivot, checkable }: Props) {
+function loadChecked(key?: string): Set<string> {
+  if (!key) return new Set()
+  try {
+    const raw = sessionStorage.getItem(key)
+    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+/** Un ingrediente può fare da pivot solo se la sua quantità scala davvero. */
+function isPivotable(ing: ScaledIngredient): boolean {
+  return Boolean(ing.scaled) && ing.scaled!.unit !== 'q.b.' && ing.scaling?.mode !== 'fixed' && ing.scaling?.mode !== 'toTaste'
+}
+
+export default function IngredientList({ scaled, onPivot, checkable, storageKey }: Props) {
   const [editing, setEditing] = useState<string | null>(null)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [checked, setChecked] = useState<Set<string>>(() => loadChecked(storageKey))
+  const isScaled = Math.abs(scaled.factor - 1) > 1e-9
+
+  useEffect(() => {
+    if (!storageKey) return
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify([...checked]))
+    } catch {
+      // storage non disponibile
+    }
+  }, [checked, storageKey])
 
   const startEdit = (ing: ScaledIngredient) => {
     if (!onPivot || !ing.scaled) return
@@ -55,6 +83,13 @@ export default function IngredientList({ scaled, onPivot, checkable }: Props) {
     else setEditing(null)
   }
 
+  const toggle = (id: string) => {
+    const next = new Set(checked)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setChecked(next)
+  }
+
   return (
     <div className="space-y-4">
       {groupBySection(scaled.ingredients).map(([section, items]) => (
@@ -65,67 +100,76 @@ export default function IngredientList({ scaled, onPivot, checkable }: Props) {
               const isEditing = editing === ing.id
               const d = ing.scaled ? toDisplayUnit(ing.scaled) : undefined
               const done = checked.has(ing.id)
+              const pivotable = Boolean(onPivot) && isPivotable(ing)
+              const showOriginal = isScaled && ing.original && ing.scaled && isPivotable(ing)
+              const Row = checkable ? 'label' : 'div'
               return (
-                <li key={ing.id} className={`flex items-start gap-3 py-2 ${done ? 'opacity-50' : ''}`}>
-                  {checkable && (
-                    <input
-                      type="checkbox"
-                      className="mt-1.5 h-5 w-5 accent-accent"
-                      checked={done}
-                      onChange={() => {
-                        const next = new Set(checked)
-                        if (done) next.delete(ing.id)
-                        else next.add(ing.id)
-                        setChecked(next)
-                      }}
-                    />
-                  )}
-                  <div className="w-30 shrink-0 text-right">
-                    {d && !isEditing && (
-                      <button
-                        className={`qty rounded-md px-1.5 py-0.5 text-[17px] font-semibold leading-tight transition ${onPivot && ing.scaling?.mode !== 'fixed' && ing.scaling?.mode !== 'toTaste' ? 'bg-surface-2 text-accent-text hover:bg-accent-soft' : 'text-fg'} ${ing.adjusted ? 'text-warning' : ''}`}
-                        onClick={() => startEdit(ing)}
-                        disabled={!onPivot}
-                        title={ing.warning}
-                      >
-                        {formatQuantity(d)}
-                      </button>
+                <li key={ing.id}>
+                  <Row className={`flex items-start gap-3 ${checkable ? 'cursor-pointer py-3' : 'py-2'} ${done ? 'opacity-50' : ''}`}>
+                    {checkable && (
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-6 w-6 shrink-0 accent-accent"
+                        checked={done}
+                        onChange={() => toggle(ing.id)}
+                        aria-label={`${ing.name}${d ? `, ${formatQuantity(d)}` : ''}`}
+                      />
                     )}
-                    {d && isEditing && (
-                      <form
-                        className="flex items-center justify-end gap-1"
-                        onSubmit={(e) => {
-                          e.preventDefault()
-                          commit(ing)
-                        }}
-                      >
-                        <input
-                          autoFocus
-                          inputMode="decimal"
-                          className="w-20 px-2 py-1 text-right"
-                          value={value}
-                          onChange={(e) => setValue(e.target.value)}
-                          onBlur={() => commit(ing)}
-                          onKeyDown={(e) => e.key === 'Escape' && setEditing(null)}
-                        />
-                        <span className="text-xs text-muted">{formatUnit(d.unit, 2)}</span>
-                      </form>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className={done ? 'line-through' : ''}>
-                      {ing.name}
-                      {ing.optional && <span className="text-muted"> (facoltativo)</span>}
-                    </span>
-                    {ing.note && <span className="text-sm text-muted">, {ing.note}</span>}
-                    {ing.adjusted && ing.warning && <p className="text-xs text-warning">{ing.warning}</p>}
-                    {isEditing && error && <p className="text-xs text-danger">{error}</p>}
-                    {ing.original && ing.scaled && Math.abs(scaled.factor - 1) > 1e-9 && (
-                      <p className="text-xs text-faint">
-                        prima {formatAmount(toDisplayUnit(ing.original).amount, toDisplayUnit(ing.original).unit)} {formatUnit(toDisplayUnit(ing.original).unit, toDisplayUnit(ing.original).amount)}
-                      </p>
-                    )}
-                  </div>
+                    <div className="w-30 shrink-0 text-right">
+                      {d && !isEditing && pivotable && (
+                        <button
+                          className="qty inline-flex min-h-8 items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-[17px] leading-tight font-semibold text-accent-text transition hover:bg-accent-soft"
+                          onClick={() => startEdit(ing)}
+                          aria-label={`Cambia la quantità di ${ing.name}, ora ${formatQuantity(d)}`}
+                          title={ing.warning ?? 'Scrivi quanto ne hai: il resto si adatta'}
+                        >
+                          <span className={ing.adjusted ? 'text-warning' : ''}>{formatQuantity(d)}</span>
+                          <Icon name="edit" size={12} className="text-muted" />
+                        </button>
+                      )}
+                      {d && !isEditing && !pivotable && (
+                        <span className={`qty inline-block px-1.5 py-0.5 text-[17px] leading-tight font-semibold ${ing.adjusted ? 'text-warning' : 'text-fg'}`} title={ing.warning}>
+                          {formatQuantity(d)}
+                        </span>
+                      )}
+                      {d && isEditing && (
+                        <form
+                          className="flex items-center justify-end gap-1"
+                          onSubmit={(e) => {
+                            e.preventDefault()
+                            commit(ing)
+                          }}
+                        >
+                          <input
+                            autoFocus
+                            inputMode="decimal"
+                            className="w-20 px-2 py-1 text-right"
+                            value={value}
+                            aria-label={`Quantità di ${ing.name} in ${formatUnit(d.unit, 2) || 'pezzi'}`}
+                            onChange={(e) => setValue(e.target.value)}
+                            onBlur={() => commit(ing)}
+                            onKeyDown={(e) => e.key === 'Escape' && setEditing(null)}
+                          />
+                          <span className="text-xs text-muted">{formatUnit(d.unit, 2)}</span>
+                        </form>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className={done ? 'line-through' : ''}>
+                        {ing.name}
+                        {ing.optional && <span className="text-muted"> (facoltativo)</span>}
+                      </span>
+                      {ing.note && <span className="text-sm text-muted">, {ing.note}</span>}
+                      {ing.adjusted && ing.warning && <p className="text-xs text-warning">{ing.warning}</p>}
+                      {isEditing && error && <p className="text-xs text-danger">{error}</p>}
+                      {showOriginal && (
+                        <p className="text-xs text-muted">
+                          prima {formatAmount(toDisplayUnit(ing.original!).amount, toDisplayUnit(ing.original!).unit)}{' '}
+                          {formatUnit(toDisplayUnit(ing.original!).unit, toDisplayUnit(ing.original!).amount)}
+                        </p>
+                      )}
+                    </div>
+                  </Row>
                 </li>
               )
             })}
