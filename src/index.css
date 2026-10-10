@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/fraunces/index.css';
+@import '@fontsource-variable/fraunces/wght-italic.css';
 
 /*
  * Token semantici. I componenti usano solo questi nomi (bg-surface, text-muted,
@@ -6,86 +8,86 @@
  */
 :root {
   color-scheme: light;
-  --bg: #f7f3ec;
+  --bg: #f8f7f3;
   --surface: #ffffff;
-  --surface-2: #f3eee6;
-  --surface-3: #e9e2d6;
-  --line: #e4dccf;
-  --fg: #1f1b16;
-  --fg-2: #4a4238;
-  --muted: #7a7064;
-  --faint: #a89d8f;
-  --accent: #c2410c;
-  --accent-strong: #9a3412;
-  --accent-soft: #fdebd9;
-  --accent-text: #9a3412;
+  --surface-2: #f0efe9;
+  --surface-3: #e4e2d9;
+  --line: #dedbd1;
+  --fg: #1c1c19;
+  --fg-2: #45453f;
+  --muted: #6f6e66;
+  --faint: #a3a299;
+  --accent: #4d7c0f;
+  --accent-strong: #3f6212;
+  --accent-soft: #e9f1d8;
+  --accent-text: #3f6212;
   --on-accent: #ffffff;
-  --warning: #92400e;
-  --warning-soft: #fdf2d6;
-  --info: #0c4a6e;
-  --info-soft: #e0f2fe;
-  --success: #14532d;
-  --success-soft: #dcfce7;
-  --danger: #991b1b;
-  --danger-soft: #fee2e2;
-  --ring: #f59e0b;
-  --shadow: 0 1px 2px rgb(31 27 22 / 0.06), 0 1px 1px rgb(31 27 22 / 0.03);
+  --warning: #8a5a00;
+  --warning-soft: #fbf1d6;
+  --info: #1e4e6b;
+  --info-soft: #e3eef5;
+  --success: #166534;
+  --success-soft: #dcefe0;
+  --danger: #9f1d1d;
+  --danger-soft: #f9e2e2;
+  --ring: #84cc16;
+  --shadow: 0 1px 2px rgb(28 28 25 / 0.06), 0 1px 1px rgb(28 28 25 / 0.03);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --bg: #15120f;
-    --surface: #1f1b17;
-    --surface-2: #2a251f;
-    --surface-3: #363028;
-    --line: #342e27;
-    --fg: #f3ede4;
-    --fg-2: #d6cec2;
-    --muted: #a3988a;
-    --faint: #6e655a;
-    --accent: #f59e0b;
-    --accent-strong: #fbbf24;
-    --accent-soft: #3a2a12;
-    --accent-text: #fbbf24;
-    --on-accent: #1a1206;
-    --warning: #fcd34d;
-    --warning-soft: #3b2f10;
-    --info: #7dd3fc;
-    --info-soft: #0f2a3a;
-    --success: #86efac;
-    --success-soft: #0f2e1b;
-    --danger: #fca5a5;
-    --danger-soft: #3f1515;
-    --ring: #fbbf24;
+    --bg: #151614;
+    --surface: #1d1f1b;
+    --surface-2: #262924;
+    --surface-3: #31352e;
+    --line: #30342d;
+    --fg: #ecebe4;
+    --fg-2: #cfcec5;
+    --muted: #9c9b91;
+    --faint: #66665d;
+    --accent: #a3c95a;
+    --accent-strong: #b9d975;
+    --accent-soft: #28311c;
+    --accent-text: #c3dc8a;
+    --on-accent: #141612;
+    --warning: #f3cf6a;
+    --warning-soft: #332a12;
+    --info: #8ec8e8;
+    --info-soft: #14262f;
+    --success: #8fd4a0;
+    --success-soft: #142a1c;
+    --danger: #f2a0a0;
+    --danger-soft: #3a1717;
+    --ring: #b9d975;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
   }
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #15120f;
-  --surface: #1f1b17;
-  --surface-2: #2a251f;
-  --surface-3: #363028;
-  --line: #342e27;
-  --fg: #f3ede4;
-  --fg-2: #d6cec2;
-  --muted: #a3988a;
-  --faint: #6e655a;
-  --accent: #f59e0b;
-  --accent-strong: #fbbf24;
-  --accent-soft: #3a2a12;
-  --accent-text: #fbbf24;
-  --on-accent: #1a1206;
-  --warning: #fcd34d;
-  --warning-soft: #3b2f10;
-  --info: #7dd3fc;
-  --info-soft: #0f2a3a;
-  --success: #86efac;
-  --success-soft: #0f2e1b;
-  --danger: #fca5a5;
-  --danger-soft: #3f1515;
-  --ring: #fbbf24;
+  --bg: #151614;
+  --surface: #1d1f1b;
+  --surface-2: #262924;
+  --surface-3: #31352e;
+  --line: #30342d;
+  --fg: #ecebe4;
+  --fg-2: #cfcec5;
+  --muted: #9c9b91;
+  --faint: #66665d;
+  --accent: #a3c95a;
+  --accent-strong: #b9d975;
+  --accent-soft: #28311c;
+  --accent-text: #c3dc8a;
+  --on-accent: #141612;
+  --warning: #f3cf6a;
+  --warning-soft: #332a12;
+  --info: #8ec8e8;
+  --info-soft: #14262f;
+  --success: #8fd4a0;
+  --success-soft: #142a1c;
+  --danger: #f2a0a0;
+  --danger-soft: #3a1717;
+  --ring: #b9d975;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
 }
 
@@ -114,7 +116,7 @@
   --color-danger-soft: var(--danger-soft);
   --color-ring: var(--ring);
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-  --font-display: ui-rounded, 'SF Pro Rounded', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   --radius-card: 1rem;
 }
 
@@ -137,7 +139,7 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
 }
 
 input,
@@ -196,8 +198,14 @@ a:focus-visible {
 @utility chip {
   @apply inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-text;
 }
-@utility label-caps {
-  @apply text-[11px] font-semibold tracking-[0.08em] uppercase text-muted;
+@utility section-title {
+  @apply font-display text-xl font-semibold text-fg;
+}
+@utility rule {
+  @apply border-t border-line;
+}
+@utility qty {
+  @apply font-display tabular-nums;
 }
 @utility notice {
   @apply rounded-xl px-3 py-2 text-sm;

@@ -67,7 +67,7 @@ Il codice dell'AI è in `src/ai/` e viene caricato solo quando serve, così il r
 
 ## Aspetto
 
-Tema chiaro e scuro: automatico in base al dispositivo, oppure a scelta in *Impostazioni → Aspetto*. I colori sono token semantici in `src/index.css` (`--bg`, `--surface`, `--accent`…): i componenti usano solo classi come `bg-surface` o `text-muted`, quindi cambiare palette o aggiungere un tema significa toccare un solo file. Le icone sono SVG a tratto in `src/app/components/Icon.tsx`.
+Identità da quaderno di cucina: carattere Fraunces (serif variabile, incluso nel bundle, funziona offline) per titoli, quantità e passaggi in cucina; accento verde oliva; sezioni separate da filetti invece che da schede. Tema chiaro e scuro: automatico in base al dispositivo, oppure a scelta in *Impostazioni → Aspetto*. I colori sono token semantici in `src/index.css` (`--bg`, `--surface`, `--accent`…): i componenti usano solo classi come `bg-surface` o `text-muted`, quindi cambiare palette o aggiungere un tema significa toccare un solo file. Le icone sono SVG a tratto in `src/app/components/Icon.tsx`.
 
 ## Dati
 

@@ -21,7 +21,7 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
   return (
     <section className="card space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="label-caps">Quantità</h2>
+        <h2 className="section-title text-lg">Dosi</h2>
         <div className="flex items-center gap-2">
           <span className={`chip ${isScaled ? '' : 'opacity-60'}`}>{formatFactor(scaled.factor)}</span>
           {isScaled && (

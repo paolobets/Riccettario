@@ -22,7 +22,7 @@ export function applyTheme(theme: Theme): void {
   if (theme === 'auto') root.removeAttribute('data-theme')
   else root.setAttribute('data-theme', theme)
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-  if (meta) meta.content = resolved(theme) === 'dark' ? '#15120f' : '#f7f3ec'
+  if (meta) meta.content = resolved(theme) === 'dark' ? '#151614' : '#f8f7f3'
 }
 
 export function saveTheme(theme: Theme): void {

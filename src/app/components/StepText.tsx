@@ -22,7 +22,7 @@ export default function StepText({ step, scaled, className }: Props) {
         return (
           <span
             key={i}
-            className={`rounded px-1 font-semibold ${s.nameOnly ? 'text-fg' : 'bg-accent-soft text-accent-text'} ${s.ingredient.adjusted ? 'ring-1 ring-warning' : ''}`}
+            className={`font-semibold ${s.nameOnly ? 'text-fg' : 'rounded-sm bg-accent-soft px-1 text-accent-text'} ${s.ingredient.adjusted ? 'underline decoration-warning decoration-2 underline-offset-2' : ''}`}
             title={s.ingredient.warning}
           >
             {s.text}

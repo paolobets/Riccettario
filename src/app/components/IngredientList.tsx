@@ -83,7 +83,7 @@ export default function IngredientList({ scaled, onPivot, checkable }: Props) {
                   <div className="w-30 shrink-0 text-right">
                     {d && !isEditing && (
                       <button
-                        className={`rounded-md px-1.5 py-0.5 font-semibold tabular-nums leading-tight transition ${onPivot && ing.scaling?.mode !== 'fixed' && ing.scaling?.mode !== 'toTaste' ? 'bg-surface-2 text-accent-text hover:bg-accent-soft' : 'text-fg'} ${ing.adjusted ? 'text-warning' : ''}`}
+                        className={`qty rounded-md px-1.5 py-0.5 text-[17px] font-semibold leading-tight transition ${onPivot && ing.scaling?.mode !== 'fixed' && ing.scaling?.mode !== 'toTaste' ? 'bg-surface-2 text-accent-text hover:bg-accent-soft' : 'text-fg'} ${ing.adjusted ? 'text-warning' : ''}`}
                         onClick={() => startEdit(ing)}
                         disabled={!onPivot}
                         title={ing.warning}
@@ -122,7 +122,7 @@ export default function IngredientList({ scaled, onPivot, checkable }: Props) {
                     {isEditing && error && <p className="text-xs text-danger">{error}</p>}
                     {ing.original && ing.scaled && Math.abs(scaled.factor - 1) > 1e-9 && (
                       <p className="text-xs text-faint">
-                        originale {formatAmount(toDisplayUnit(ing.original).amount, toDisplayUnit(ing.original).unit)} {formatUnit(toDisplayUnit(ing.original).unit, toDisplayUnit(ing.original).amount)}
+                        prima {formatAmount(toDisplayUnit(ing.original).amount, toDisplayUnit(ing.original).unit)} {formatUnit(toDisplayUnit(ing.original).unit, toDisplayUnit(ing.original).amount)}
                       </p>
                     )}
                   </div>

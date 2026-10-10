@@ -94,7 +94,7 @@ export default function CookMode() {
         </Link>
         <div className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-accent-text">{recipe.title}</div>
         <span className="chip">
-          {Math.round(scaled.servings * 100) / 100} porz. · {formatFactor(scaled.factor)}
+          {Math.round(scaled.servings * 100) / 100} porzioni{Math.abs(scaled.factor - 1) > 1e-9 ? `, ${formatFactor(scaled.factor)}` : ''}
         </span>
       </header>
       <div className="h-1 w-full bg-surface-3">
@@ -123,7 +123,7 @@ export default function CookMode() {
             </div>
             {recipe.steps.some((s) => s.equipment?.length) && (
               <div className="card">
-                <h2 className="label-caps mb-1">Attrezzatura</h2>
+                <h2 className="section-title mb-1 text-lg">Attrezzatura</h2>
                 <ul className="list-inside list-disc text-fg-2">
                   {[...new Set(recipe.steps.flatMap((s) => s.equipment ?? []))].map((e) => (
                     <li key={e}>{e}</li>
@@ -136,16 +136,24 @@ export default function CookMode() {
 
         {step && (
           <section className="flex flex-1 flex-col gap-5">
-            <div className="flex items-center gap-2 text-sm text-muted">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
               <span className="font-semibold text-accent-text">
                 Passo {index + 1} di {total}
               </span>
-              {step.section && <span>· {step.section}</span>}
+              {step.section && <span>{step.section}</span>}
               {step.type && <span className="chip">{STEP_TYPE_LABELS[step.type]}</span>}
-              {step.durationMin && <span>· {formatDuration(step.durationMin)}</span>}
-              {step.temperatureC && <span>· {step.temperatureC} °C</span>}
+              {step.durationMin && (
+                <span className="inline-flex items-center gap-1">
+                  <Icon name="timer" size={13} /> {formatDuration(step.durationMin)}
+                </span>
+              )}
+              {step.temperatureC && (
+                <span className="inline-flex items-center gap-1">
+                  <Icon name="flame" size={13} /> {step.temperatureC} °C
+                </span>
+              )}
             </div>
-            <StepText step={step} scaled={scaled} className="text-2xl leading-relaxed sm:text-3xl" />
+            <StepText step={step} scaled={scaled} className="font-display text-[26px] leading-snug font-normal sm:text-3xl" />
             {step.equipment && step.equipment.length > 0 && (
               <p className="inline-flex items-center gap-2 text-muted">
                 <Icon name="pan" size={16} /> {step.equipment.join(', ')}
@@ -162,7 +170,7 @@ export default function CookMode() {
             )}
             {parallel.length > 0 && (
               <div className="rounded-xl border border-line bg-info-soft p-3">
-                <h2 className="label-caps mb-1 text-info">Nel frattempo puoi</h2>
+                <h2 className="section-title mb-1 text-lg text-info">Nel frattempo puoi</h2>
                 <ul className="space-y-1">
                   {parallel.map(({ step: p, index: i }) => (
                     <li key={p.id}>
@@ -176,7 +184,7 @@ export default function CookMode() {
             )}
             {stepIngredients.length > 0 && (
               <div className="card mt-auto">
-                <h2 className="label-caps mb-1">In questo passo</h2>
+                <h2 className="section-title mb-1 text-lg">In questo passo</h2>
                 <IngredientList scaled={{ ...scaled, ingredients: stepIngredients, warnings: [] }} />
               </div>
             )}

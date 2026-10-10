@@ -512,7 +512,7 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
                 {draft.steps.map((o, k) =>
                   o.id === step.id ? null : (
                     <option key={o.id} value={o.id}>
-                      passo {k + 1}{o.timerMinutes ? ` (timer ${o.timerMinutes} min)` : ''}{o.type ? ` · ${STEP_TYPE_LABELS[o.type]}` : ''}
+                      passo {k + 1}{o.timerMinutes ? ` (timer ${o.timerMinutes} min)` : ''}{o.type ? `, ${STEP_TYPE_LABELS[o.type]}` : ''}
                     </option>
                   ),
                 )}
@@ -562,7 +562,7 @@ function PhaseReview({ recipe }: { recipe: Recipe }) {
       <div className="card">
         <h2 className="text-xl font-bold text-fg">{recipe.title}</h2>
         <p className="text-sm text-muted">
-          {recipe.servings} porzioni · {recipe.ingredients.length} ingredienti · {recipe.steps.length} passaggi
+          {recipe.servings} porzioni, {recipe.ingredients.length} ingredienti, {recipe.steps.length} passaggi
         </p>
       </div>
       <div className="card">

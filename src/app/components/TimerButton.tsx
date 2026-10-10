@@ -23,7 +23,7 @@ export default function TimerButton({ recipeId, stepId, timer, size = 'sm' }: Pr
         className={`btn-secondary ${big ? 'px-6 py-3 text-lg' : 'text-sm'}`}
         onClick={() => start({ recipeId, stepId, label, minutes: timer.minutes })}
       >
-        <Icon name="timer" size={big ? 20 : 16} /> {label} · {formatRemaining(timer.minutes * 60)}
+        <Icon name="timer" size={big ? 20 : 16} /> {label}, {formatRemaining(timer.minutes * 60)}
       </button>
     )
   }

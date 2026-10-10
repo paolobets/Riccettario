@@ -48,7 +48,7 @@ export default function RecipeView() {
     <article className="space-y-5">
       <header className="space-y-2">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-3xl font-bold text-fg">{recipe.title}</h1>
+          <h1 className="text-4xl font-medium leading-tight text-fg">{recipe.title}</h1>
           <div className="flex shrink-0 gap-1">
             <Link to={`/ricetta/${recipe.id}/modifica`} className="btn-ghost px-2 py-1 text-sm" aria-label="Modifica">
               <Icon name="edit" size={16} />
@@ -79,10 +79,14 @@ export default function RecipeView() {
             </button>
           </div>
         </div>
-        {recipe.description && <p className="text-fg-2">{recipe.description}</p>}
-        <div className="flex flex-wrap gap-2 text-xs text-muted">
-          {total > 0 && <span>Totale {formatDuration(total)}</span>}
-          {active > 0 && active !== total && <span>· attivo {formatDuration(active)}</span>}
+        {recipe.description && <p className="text-lg text-fg-2">{recipe.description}</p>}
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
+          {total > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Icon name="timer" size={14} /> {formatDuration(total)}
+              {active > 0 && active !== total && <span>, di cui {formatDuration(active)} ai fornelli</span>}
+            </span>
+          )}
           {recipe.tags.map((t) => (
             <span key={t} className="chip">
               {t}
@@ -106,13 +110,13 @@ export default function RecipeView() {
 
       <AiPanel recipe={recipe} factor={scaled.factor} />
 
-      <section className="card">
-        <h2 className="label-caps mb-2">Ingredienti</h2>
+      <section className="rule pt-4">
+        <h2 className="section-title mb-2">Ingredienti</h2>
         <IngredientList scaled={scaled} onPivot={scaler.setPivot} />
       </section>
 
-      <section className="card">
-        <h2 className="label-caps mb-3">Preparazione</h2>
+      <section className="rule pt-4">
+        <h2 className="section-title mb-3">Preparazione</h2>
         <div className="space-y-5">
           {groupSteps(recipe.steps).map(([section, steps]) => (
             <div key={section ?? '_'}>
@@ -122,9 +126,9 @@ export default function RecipeView() {
                   stepNumber += 1
                   return (
                     <li key={step.id} className="flex gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-on-accent">{stepNumber}</span>
+                      <span className="qty flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-on-accent">{stepNumber}</span>
                       <div className="min-w-0 flex-1 space-y-1">
-                        <StepText step={step} scaled={scaled} className="leading-relaxed" />
+                        <StepText step={step} scaled={scaled} className="text-[17px] leading-relaxed" />
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
                           {step.type && <span className="chip">{STEP_TYPE_LABELS[step.type]}</span>}
                           {step.durationMin && <span>{formatDuration(step.durationMin)}</span>}
@@ -152,21 +156,22 @@ export default function RecipeView() {
       </section>
 
       {recipe.notes && (
-        <section className="card">
-          <h2 className="label-caps mb-1">Note</h2>
+        <section className="rule pt-4">
+          <h2 className="section-title mb-1">Note</h2>
           <p className="whitespace-pre-wrap text-fg-2">{recipe.notes}</p>
         </section>
       )}
 
       {sessions && sessions.length > 0 && (
-        <section className="card">
-          <h2 className="label-caps mb-2">Diario di cottura</h2>
+        <section className="rule pt-4">
+          <h2 className="section-title mb-2">Diario di cottura</h2>
           <ul className="space-y-2 text-sm">
             {sessions.map((s) => (
               <li key={s.id} className="border-l-2 border-line pl-3">
-                <div className="text-muted">
-                  {new Date(s.startedAt).toLocaleDateString('it-IT')} · ×{Math.round(s.factor * 100) / 100}
-                  {s.rating ? ` · ${'★'.repeat(s.rating)}${'☆'.repeat(5 - s.rating)}` : ''}
+                <div className="flex flex-wrap items-center gap-2 text-muted">
+                  <span>{new Date(s.startedAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                  <span className="chip">×{Math.round(s.factor * 100) / 100}</span>
+                  {s.rating ? <span className="text-warning">{'★'.repeat(s.rating)}{'☆'.repeat(5 - s.rating)}</span> : null}
                 </div>
                 {s.notes && <p>{s.notes}</p>}
               </li>

@@ -8,7 +8,7 @@ export default function Layout() {
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-md">
-        <Link to="/" className="flex items-center gap-2 text-lg font-bold text-accent-text">
+        <Link to="/" className="font-display flex items-center gap-2 text-xl font-semibold text-fg">
           <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" className="h-7 w-7 rounded-lg" />
           {APP_NAME}
         </Link>

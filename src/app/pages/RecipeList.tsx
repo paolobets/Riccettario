@@ -45,7 +45,7 @@ export default function RecipeList() {
         />
       </label>
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pb-1">
           <button className={`chip ${tag === null ? 'ring-2 ring-accent' : ''}`} onClick={() => setTag(null)}>
             tutte
           </button>
@@ -73,15 +73,15 @@ export default function RecipeList() {
         </div>
       )}
 
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className="rule divide-y divide-line">
         {filtered.map((r) => {
           const minutes = totalDuration(r.steps)
           return (
             <li key={r.id}>
-              <Link to={`/ricetta/${r.id}`} className="card block transition hover:-translate-y-0.5 hover:border-accent">
-                <h2 className="text-lg font-semibold text-fg">{r.title}</h2>
+              <Link to={`/ricetta/${r.id}`} className="group -mx-2 block rounded-xl px-2 py-4 transition hover:bg-surface-2">
+                <h2 className="font-display text-2xl font-medium text-fg group-hover:text-accent-text">{r.title}</h2>
                 {r.description && <p className="mt-1 line-clamp-2 text-sm text-muted">{r.description}</p>}
-                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
                   <span className="inline-flex items-center gap-1">
                     <Icon name="chef" size={14} /> {r.servings} porz.
                   </span>
