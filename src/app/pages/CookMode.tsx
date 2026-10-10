@@ -1,0 +1,203 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '@/data/db'
+import { finishSession, startSession } from '@/data/repo'
+import { formatDuration, formatFactor, ingredientIdsInStep, STEP_TYPE_LABELS } from '@/core'
+import { useScaler } from '../hooks/useScaler'
+import IngredientList from '../components/IngredientList'
+import StepText from '../components/StepText'
+import TimerButton from '../components/TimerButton'
+
+/** Tiene lo schermo acceso finché la pagina è aperta (dove il browser lo permette). */
+function useWakeLock() {
+  useEffect(() => {
+    let lock: WakeLockSentinel | null = null
+    const request = async () => {
+      try {
+        if ('wakeLock' in navigator && document.visibilityState === 'visible') {
+          lock = await navigator.wakeLock.request('screen')
+        }
+      } catch {
+        // non supportato o negato
+      }
+    }
+    request()
+    document.addEventListener('visibilitychange', request)
+    return () => {
+      document.removeEventListener('visibilitychange', request)
+      lock?.release().catch(() => undefined)
+    }
+  }, [])
+}
+
+export default function CookMode() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const recipe = useLiveQuery(() => (id ? db.recipes.get(id) : undefined), [id])
+  const scaler = useScaler(recipe)
+  // -1 = mise en place, steps.length = fine
+  const [index, setIndex] = useState(-1)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [rating, setRating] = useState(0)
+  const [notes, setNotes] = useState('')
+  useWakeLock()
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
+      if (e.key === 'ArrowRight' || e.key === ' ') setIndex((i) => Math.min(i + 1, recipe?.steps.length ?? 0))
+      if (e.key === 'ArrowLeft') setIndex((i) => Math.max(i - 1, -1))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [recipe])
+
+  const scaled = scaler.scaled
+  const step = recipe && index >= 0 ? recipe.steps[index] : undefined
+  const stepIngredients = useMemo(() => {
+    if (!step || !scaled) return []
+    return ingredientIdsInStep(step)
+      .map((iid) => scaled.byId.get(iid))
+      .filter((x): x is NonNullable<typeof x> => Boolean(x))
+  }, [step, scaled])
+
+  if (!recipe || !scaled) return null
+  const total = recipe.steps.length
+  const isEnd = index >= total
+  const progress = Math.max(0, Math.min(1, (index + 1) / (total + 1)))
+
+  const begin = async () => {
+    if (!sessionId) {
+      const s = await startSession(recipe.id, scaler.factor)
+      setSessionId(s.id)
+    }
+    setIndex(0)
+  }
+
+  const finish = async () => {
+    if (sessionId) await finishSession(sessionId, { rating: rating || undefined, notes: notes.trim() || undefined })
+    navigate(`/ricetta/${recipe.id}`)
+  }
+
+  return (
+    <div className="mx-auto flex min-h-screen max-w-2xl flex-col bg-brand-50">
+      <header className="flex items-center justify-between gap-3 px-4 py-3">
+        <Link to={`/ricetta/${recipe.id}${scaler.search ? `?${scaler.search}` : ''}`} className="btn-ghost px-2 py-1 text-sm">
+          ✕ Esci
+        </Link>
+        <div className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-brand-900">{recipe.title}</div>
+        <span className="chip">
+          {Math.round(scaled.servings * 100) / 100} porz. · {formatFactor(scaled.factor)}
+        </span>
+      </header>
+      <div className="h-1 w-full bg-brand-100">
+        <div className="h-1 bg-brand-700 transition-all" style={{ width: `${progress * 100}%` }} />
+      </div>
+
+      <main className="flex flex-1 flex-col px-5 py-6">
+        {index < 0 && (
+          <section className="space-y-4">
+            <h1 className="text-2xl font-bold text-brand-900">Prima di iniziare</h1>
+            <p className="text-stone-700">Pesa e prepara tutto. Spunta man mano.</p>
+            {scaled.warnings.map((w) => (
+              <p key={w} className="rounded-lg bg-stone-100 p-2 text-sm text-stone-700">
+                ⚠︎ {w}
+              </p>
+            ))}
+            <div className="card">
+              <IngredientList scaled={scaled} checkable />
+            </div>
+            {recipe.steps.some((s) => s.equipment?.length) && (
+              <div className="card">
+                <h2 className="mb-1 font-semibold text-brand-900">Attrezzatura</h2>
+                <ul className="list-inside list-disc text-stone-700">
+                  {[...new Set(recipe.steps.flatMap((s) => s.equipment ?? []))].map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
+
+        {step && (
+          <section className="flex flex-1 flex-col gap-5">
+            <div className="flex items-center gap-2 text-sm text-stone-500">
+              <span className="font-semibold text-brand-800">
+                Passo {index + 1} di {total}
+              </span>
+              {step.section && <span>· {step.section}</span>}
+              {step.type && <span className="chip">{STEP_TYPE_LABELS[step.type]}</span>}
+              {step.durationMin && <span>· {formatDuration(step.durationMin)}</span>}
+              {step.temperatureC && <span>· {step.temperatureC} °C</span>}
+            </div>
+            <StepText step={step} scaled={scaled} className="text-2xl leading-relaxed sm:text-3xl" />
+            {step.equipment && step.equipment.length > 0 && (
+              <p className="text-stone-600">🍳 {step.equipment.join(', ')}</p>
+            )}
+            {step.timer && (
+              <div>
+                <TimerButton key={step.id} timer={step.timer} size="lg" />
+              </div>
+            )}
+            {stepIngredients.length > 0 && (
+              <div className="card mt-auto">
+                <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-brand-800">In questo passo</h2>
+                <IngredientList scaled={{ ...scaled, ingredients: stepIngredients, warnings: [] }} />
+              </div>
+            )}
+          </section>
+        )}
+
+        {isEnd && (
+          <section className="space-y-4">
+            <h1 className="text-2xl font-bold text-brand-900">Fatto! 🎉</h1>
+            <p className="text-stone-700">Com'è venuta? Due righe adesso valgono oro la prossima volta.</p>
+            <div className="flex gap-1 text-3xl">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button key={n} onClick={() => setRating(n)} className={n <= rating ? 'text-brand-600' : 'text-stone-300'} aria-label={`${n} stelle`}>
+                  ★
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="w-full"
+              rows={4}
+              placeholder="Cosa cambieresti? Tempi, quantità, consistenza…"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </section>
+        )}
+      </main>
+
+      <footer className="sticky bottom-0 flex gap-3 border-t border-brand-200 bg-brand-50/95 px-4 py-3 backdrop-blur">
+        {index < 0 ? (
+          <button className="btn-primary flex-1 py-3 text-lg" onClick={begin}>
+            Inizia
+          </button>
+        ) : isEnd ? (
+          <>
+            <button className="btn-secondary py-3" onClick={() => setIndex(total - 1)}>
+              ← Indietro
+            </button>
+            <button className="btn-primary flex-1 py-3 text-lg" onClick={finish}>
+              Salva e chiudi
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn-secondary py-3" onClick={() => setIndex(index - 1)}>
+              ← Indietro
+            </button>
+            <button className="btn-primary flex-1 py-3 text-lg" onClick={() => setIndex(index + 1)}>
+              {index === total - 1 ? 'Finito' : 'Avanti →'}
+            </button>
+          </>
+        )}
+      </footer>
+    </div>
+  )
+}
