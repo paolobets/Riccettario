@@ -7,6 +7,7 @@ import RecipeView from './pages/RecipeView'
 import CookMode from './pages/CookMode'
 import RecipeWizard from './pages/RecipeWizard'
 import Settings from './pages/Settings'
+import ImportPage from './pages/ImportPage'
 
 export default function App() {
   const [ready, setReady] = useState(false)
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="ricetta/:id" element={<RecipeView />} />
         <Route path="ricetta/:id/modifica" element={<RecipeWizard />} />
         <Route path="impostazioni" element={<Settings />} />
+        <Route path="importa" element={<ImportPage />} />
       </Route>
       <Route path="ricetta/:id/cucina" element={<CookMode />} />
     </Routes>

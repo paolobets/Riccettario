@@ -97,6 +97,10 @@ I timer avviati (da lettura o da modalità cucina) vivono in un unico store pers
 
 `renderStep` in `steps.ts` sostituisce i riferimenti con la quantità già scalata ("350 g di acqua"), così lettura e modalità cucina mostrano sempre i numeri giusti.
 
+## Scambio con l'AI
+
+`src/ai/schema.ts` definisce con zod uno schema di scambio più semplice del modello interno: riferimenti agli ingredienti per id scelto dall'AI, passaggi paralleli per indice, campi `null` invece di assenti. `aiToRecipe` lo converte in `Recipe` normalizzando gli id (`slugify`, deduplica), riscrivendo i riferimenti `{id}` nei passaggi, risolvendo le percentuali del panettiere e scartando con avviso ciò che non torna. Le richieste usano l'output strutturato dell'API (`output_config.format`), quindi la risposta è sempre JSON valido rispetto allo schema.
+
 ## Sessioni di cottura
 
 Ogni avvio della modalità cucina crea una `CookSession` (ricetta, fattore, data) che alla fine riceve voto e note. È la base per la futura evoluzione assistita delle ricette.

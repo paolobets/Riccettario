@@ -56,9 +56,14 @@ export default function RecipeList() {
       {filtered.length === 0 && (
         <div className="card text-center text-stone-600">
           <p>Nessuna ricetta trovata.</p>
-          <Link to="/ricetta/nuova" className="btn-primary mt-3">
-            Crea la prima ricetta
-          </Link>
+          <div className="mt-3 flex justify-center gap-2">
+            <Link to="/ricetta/nuova" className="btn-primary">
+              Crea la prima ricetta
+            </Link>
+            <Link to="/importa" className="btn-secondary">
+              ✨ Importa con l'AI
+            </Link>
+          </div>
         </div>
       )}
 

@@ -11,6 +11,9 @@ export default function Layout() {
           {APP_NAME}
         </Link>
         <nav className="flex items-center gap-1 text-sm">
+          <NavLink to="/importa" className="btn-ghost px-3 py-1.5">
+            ✨ Importa
+          </NavLink>
           <NavLink to="/ricetta/nuova" className="btn-primary px-3 py-1.5">
             + Nuova
           </NavLink>

@@ -1,9 +1,16 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { exportAll, importJson } from '@/data/repo'
+import { DEFAULT_MODEL, loadAiSettings, MODELS, saveAiSettings, type AiSettings } from '@/ai/settings'
 
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [ai, setAi] = useState<AiSettings>({ apiKey: '', proxyUrl: '', model: DEFAULT_MODEL })
+  const [aiSaved, setAiSaved] = useState(false)
+  const [showKey, setShowKey] = useState(false)
+  useEffect(() => {
+    loadAiSettings().then(setAi)
+  }, [])
 
   const download = async () => {
     const json = await exportAll()
@@ -28,6 +35,60 @@ export default function Settings() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-brand-900">Impostazioni</h1>
+      <section className="card space-y-3">
+        <h2 className="font-semibold">Assistente AI</h2>
+        <p className="text-sm text-stone-600">
+          Serve per importare ricette da testo e foto, fare domande e creare varianti. La chiave resta solo su questo dispositivo e viene inviata esclusivamente ad Anthropic (o al tuo proxy). Ogni richiesta ha un costo sul tuo account.
+        </p>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-stone-700">Chiave API Anthropic</span>
+          <div className="flex gap-2">
+            <input
+              className="flex-1 font-mono text-sm"
+              type={showKey ? 'text' : 'password'}
+              autoComplete="off"
+              placeholder="sk-ant-…"
+              value={ai.apiKey}
+              onChange={(e) => {
+                setAi({ ...ai, apiKey: e.target.value })
+                setAiSaved(false)
+              }}
+            />
+            <button className="btn-secondary px-3" type="button" onClick={() => setShowKey(!showKey)}>
+              {showKey ? 'Nascondi' : 'Mostra'}
+            </button>
+          </div>
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-stone-700">Modello</span>
+          <select className="w-full" value={ai.model} onChange={(e) => { setAi({ ...ai, model: e.target.value }); setAiSaved(false) }}>
+            {MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <details className="text-sm">
+          <summary className="cursor-pointer text-stone-700">Opzionale: proxy per non tenere la chiave nel browser</summary>
+          <p className="mt-2 text-stone-600">
+            Pubblica <code>proxy/cloudflare-worker.js</code> (istruzioni nel file), poi inserisci qui l'URL del worker e, nel campo chiave, la password del proxy.
+          </p>
+          <input className="mt-2 w-full" type="url" placeholder="https://ricettario-proxy.xxx.workers.dev" value={ai.proxyUrl} onChange={(e) => { setAi({ ...ai, proxyUrl: e.target.value }); setAiSaved(false) }} />
+        </details>
+        <div className="flex items-center gap-3">
+          <button
+            className="btn-primary"
+            onClick={async () => {
+              await saveAiSettings(ai)
+              setAiSaved(true)
+            }}
+          >
+            Salva
+          </button>
+          {aiSaved && <span className="text-sm text-green-700">Salvato.</span>}
+        </div>
+      </section>
       <section className="card space-y-3">
         <h2 className="font-semibold">Backup</h2>
         <p className="text-sm text-stone-600">

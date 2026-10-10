@@ -8,6 +8,7 @@ import ScalerPanel from '../components/ScalerPanel'
 import IngredientList from '../components/IngredientList'
 import StepText from '../components/StepText'
 import TimerButton from '../components/TimerButton'
+import AiPanel from '../components/AiPanel'
 
 function groupSteps(steps: Step[]): Array<[string | undefined, Step[]]> {
   const map = new Map<string | undefined, Step[]>()
@@ -58,7 +59,7 @@ export default function RecipeView() {
                 navigate(`/ricetta/${copy.id}/modifica`)
               }}
             >
-              Variante
+              Duplica
             </button>
             <button
               className="btn-ghost px-2 py-1 text-sm text-red-700"
@@ -97,6 +98,8 @@ export default function RecipeView() {
         onFactor={scaler.setFactor}
         onReset={scaler.reset}
       />
+
+      <AiPanel recipe={recipe} factor={scaled.factor} />
 
       <section className="card">
         <h2 className="mb-2 font-semibold text-brand-900">Ingredienti</h2>

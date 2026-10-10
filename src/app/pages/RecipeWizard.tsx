@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { db } from '@/data/db'
 import { saveRecipe } from '@/data/repo'
 import {
@@ -162,9 +162,11 @@ function toRecipe(d: Draft, base: Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>
 export default function RecipeWizard() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [phase, setPhase] = useState<Phase>(0)
-  const [draft, setDraft] = useState<Draft | null>(id ? null : fromRecipe({ ...emptyRecipe(), ingredients: [], steps: [] }))
-  const [base, setBase] = useState<Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>>(() => emptyRecipe())
+  const location = useLocation()
+  const prefill = (location.state ?? {}) as { recipe?: Recipe; warnings?: string[]; fromAi?: boolean }
+  const [phase, setPhase] = useState<Phase>(prefill.recipe ? 3 : 0)
+  const [draft, setDraft] = useState<Draft | null>(id ? null : fromRecipe(prefill.recipe ?? { ...emptyRecipe(), ingredients: [], steps: [] }))
+  const [base, setBase] = useState<Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>>(() => (prefill.recipe ? { id: prefill.recipe.id, createdAt: prefill.recipe.createdAt, updatedAt: prefill.recipe.updatedAt } : emptyRecipe()))
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -192,18 +194,26 @@ export default function RecipeWizard() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-brand-900">{id ? 'Modifica ricetta' : 'Nuova ricetta'}</h1>
+        <h1 className="text-2xl font-bold text-brand-900">{id ? 'Modifica ricetta' : prefill.fromAi ? 'Ricetta importata' : 'Nuova ricetta'}</h1>
         <Link to={id ? `/ricetta/${id}` : '/'} className="btn-ghost px-2 py-1 text-sm">
           Annulla
         </Link>
       </div>
+      {prefill.fromAi && (
+        <div className="rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
+          <p>L'AI ha strutturato la ricetta. Controlla ingredienti, regole di scalatura e passaggi, poi salva.</p>
+          {prefill.warnings?.map((w) => (
+            <p key={w} className="mt-1 text-amber-800">⚠︎ {w}</p>
+          ))}
+        </div>
+      )}
       <ol className="flex gap-1 text-xs">
         {PHASES.map((p, i) => (
           <li key={p} className="flex-1">
             <button
-              className={`w-full rounded-full px-2 py-1 ${i === phase ? 'bg-brand-700 text-white' : i < phase ? 'bg-brand-200 text-brand-900' : 'bg-stone-200 text-stone-600'}`}
-              onClick={() => i < phase && setPhase(i as Phase)}
-              disabled={i > phase}
+              className={`w-full rounded-full px-2 py-1 ${i === phase ? 'bg-brand-700 text-white' : i < phase || prefill.fromAi ? 'bg-brand-200 text-brand-900' : 'bg-stone-200 text-stone-600'}`}
+              onClick={() => (i < phase || prefill.fromAi) && setPhase(i as Phase)}
+              disabled={i > phase && !prefill.fromAi}
             >
               {i + 1}. {p}
             </button>

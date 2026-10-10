@@ -10,6 +10,7 @@
 - Timer multipli persistenti (barra sempre visibile, sopravvivono al ricaricamento, tocco per saltare al passaggio).
 - Passaggi paralleli (`parallelWith`): "nel frattempo puoi" in modalità cucina, selezione nel wizard.
 - Nome e colori dell'app in un unico file (`src/app/branding.ts`).
+- Assistente AI: import da testo, foto e URL con output strutturato validato (zod) e revisione nel wizard; domande in streaming con contesto (ricetta, fattore, diario); varianti complete salvate accanto all'originale. Chiave sul dispositivo o proxy Cloudflare opzionale.
 
 ## Prossimi passi
 
@@ -19,11 +20,11 @@
 - Conversione unità (tazze ↔ grammi per ingredienti noti).
 - Foto per ricetta e per passaggio.
 
-### AI (richiede un piccolo backend per non esporre la chiave)
-1. **Import**: da testo incollato, URL o foto → ricetta strutturata con regole di scalatura proposte, da confermare nel wizard.
-2. **Valutazione varianti**: "sostituisco il burro con olio", "triplico la dose: i tempi reggono?" ragionando sulla struttura.
-3. **Evoluzione**: dalle sessioni di cottura (voti, note) proporre modifiche e creare una variante versionata.
-4. **Assistente in cottura**: domande al volo sul passaggio corrente.
+### AI
+- Assistente in cottura: domande al volo sul passaggio corrente dalla modalità cucina.
+- Verifica dal vivo dell'import da URL (usa il tool `web_fetch` lato server): finora provato solo con risposte simulate.
+- Stima del costo prima di ogni richiesta (conteggio token).
+- Storico delle conversazioni per ricetta.
 
 ### Infrastruttura
 - Sincronizzazione tra dispositivi (opzionale, es. PocketBase o file su cloud).
