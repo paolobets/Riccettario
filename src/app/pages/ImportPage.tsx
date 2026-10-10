@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { isAiConfigured, loadAiSettings } from '@/ai/settings'
+import Icon from '../components/Icon'
 
 type Mode = 'text' | 'photo' | 'url'
 
@@ -38,13 +39,13 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-brand-900">Importa con l'AI</h1>
-      <p className="text-sm text-stone-600">
+      <h1 className="text-2xl font-bold text-fg">Importa con l'AI</h1>
+      <p className="text-sm text-muted">
         Incolla il testo di una ricetta, fotografa una pagina o indica un indirizzo web. L'AI la trasforma in una ricetta strutturata con le regole di scalatura; poi la rivedi nel wizard prima di salvarla.
       </p>
 
       {configured === false && (
-        <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="notice bg-warning-soft text-warning">
           L'AI non è ancora configurata.{' '}
           <Link to="/impostazioni" className="underline">
             Inserisci la chiave API nelle impostazioni
@@ -53,7 +54,7 @@ export default function ImportPage() {
         </div>
       )}
 
-      <div className="flex gap-1 rounded-xl bg-brand-100 p-1">
+      <div className="flex gap-1 rounded-xl bg-surface-2 p-1">
         {(
           [
             ['text', 'Testo'],
@@ -63,7 +64,7 @@ export default function ImportPage() {
         ).map(([m, label]) => (
           <button
             key={m}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${mode === m ? 'bg-white text-brand-900 shadow-sm' : 'text-brand-800'}`}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${mode === m ? 'bg-surface text-fg shadow-sm' : 'text-muted'}`}
             onClick={() => setMode(m)}
           >
             {label}
@@ -100,7 +101,7 @@ export default function ImportPage() {
             }}
           />
           <button className="btn-secondary w-full py-3" onClick={() => fileRef.current?.click()}>
-            📷 Scatta o scegli foto
+            <Icon name="camera" /> Scatta o scegli foto
           </button>
           {files.length > 0 && (
             <ul className="grid grid-cols-3 gap-2">
@@ -108,21 +109,21 @@ export default function ImportPage() {
                 <li key={`${f.name}-${i}`} className="relative">
                   <img src={URL.createObjectURL(f)} alt="" className="aspect-square w-full rounded-lg object-cover" />
                   <button
-                    className="absolute top-1 right-1 rounded-full bg-white/90 px-2 text-sm"
+                    className="absolute top-1 right-1 rounded-full bg-surface/90 px-2 text-sm"
                     onClick={() => setFiles(files.filter((_, k) => k !== i))}
                     aria-label="Rimuovi foto"
                   >
-                    ✕
+                    <Icon name="close" size={14} />
                   </button>
                 </li>
               ))}
             </ul>
           )}
-          <p className="text-xs text-stone-500">Più pagine? Aggiungi più foto: vengono ridotte prima dell'invio.</p>
+          <p className="text-xs text-muted">Più pagine? Aggiungi più foto: vengono ridotte prima dell'invio.</p>
         </div>
       )}
 
-      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+      {error && <p className="notice bg-danger-soft text-danger">{error}</p>}
 
       <button className="btn-primary w-full py-3 text-lg" onClick={run} disabled={!canRun || status !== null || configured === false}>
         {status ?? 'Struttura la ricetta'}

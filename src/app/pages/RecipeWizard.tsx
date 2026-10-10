@@ -19,6 +19,7 @@ import {
   type Unit,
 } from '@/core'
 import StepText from '../components/StepText'
+import Icon from '../components/Icon'
 
 type Phase = 0 | 1 | 2 | 3
 const PHASES = ['Ricetta', 'Ingredienti', 'Passaggi', 'Riepilogo']
@@ -194,19 +195,21 @@ export default function RecipeWizard() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-brand-900">{id ? 'Modifica ricetta' : prefill.fromAi ? 'Ricetta importata' : 'Nuova ricetta'}</h1>
+        <h1 className="text-2xl font-bold text-fg">{id ? 'Modifica ricetta' : prefill.fromAi ? 'Ricetta importata' : 'Nuova ricetta'}</h1>
         <Link to={id ? `/ricetta/${id}` : '/'} className="btn-ghost px-2 py-1 text-sm">
           Annulla
         </Link>
       </div>
       {prefill.fromAi && (
-        <div className="rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
+        <div className="notice bg-info-soft text-info">
           <p>
             L'AI ha strutturato la ricetta. Controlla ingredienti, regole di scalatura e passaggi, poi salva.
-            {prefill.costUsd !== undefined && <span className="text-sky-700"> Costo della richiesta: {prefill.costUsd < 0.01 ? '< $0,01' : `$${prefill.costUsd.toFixed(2)}`}.</span>}
+            {prefill.costUsd !== undefined && <span className="text-info"> Costo della richiesta: {prefill.costUsd < 0.01 ? '< $0,01' : `$${prefill.costUsd.toFixed(2)}`}.</span>}
           </p>
           {prefill.warnings?.map((w) => (
-            <p key={w} className="mt-1 text-amber-800">⚠︎ {w}</p>
+            <p key={w} className="mt-1 flex items-start gap-1 text-warning">
+              <Icon name="alert" size={14} className="mt-0.5" /> {w}
+            </p>
           ))}
         </div>
       )}
@@ -214,7 +217,7 @@ export default function RecipeWizard() {
         {PHASES.map((p, i) => (
           <li key={p} className="flex-1">
             <button
-              className={`w-full rounded-full px-2 py-1 ${i === phase ? 'bg-brand-700 text-white' : i < phase || prefill.fromAi ? 'bg-brand-200 text-brand-900' : 'bg-stone-200 text-stone-600'}`}
+              className={`w-full rounded-full px-2 py-1 transition ${i === phase ? 'bg-accent text-on-accent' : i < phase || prefill.fromAi ? 'bg-accent-soft text-accent-text' : 'bg-surface-3 text-muted'}`}
               onClick={() => (i < phase || prefill.fromAi) && setPhase(i as Phase)}
               disabled={i > phase && !prefill.fromAi}
             >
@@ -231,11 +234,11 @@ export default function RecipeWizard() {
 
       <div className="flex justify-between gap-3">
         <button className="btn-secondary" onClick={() => setPhase((phase - 1) as Phase)} disabled={phase === 0}>
-          ← Indietro
+          <Icon name="left" size={16} /> Indietro
         </button>
         {phase < 3 ? (
           <button className="btn-primary" onClick={() => setPhase((phase + 1) as Phase)} disabled={!canNext}>
-            Avanti →
+            Avanti <Icon name="right" size={16} />
           </button>
         ) : (
           <button className="btn-primary" onClick={save} disabled={saving}>
@@ -255,9 +258,9 @@ function emptyRecipe(): Recipe {
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-stone-700">{label}</span>
+      <span className="mb-1 block text-sm font-medium text-fg-2">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-stone-500">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
     </label>
   )
 }
@@ -313,13 +316,13 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
 
   return (
     <section className="space-y-3">
-      <p className="text-sm text-stone-600">
+      <p className="text-sm text-muted">
         Per ogni ingrediente scegli come deve scalare. Il sale e il lievito di solito sono <b>sub-lineari</b>, le uova <b>a pezzi interi</b>.
       </p>
       {draft.ingredients.map((ing, idx) => (
         <div key={ing.id} className="card space-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-stone-500">#{idx + 1}</span>
+            <span className="text-sm font-semibold text-muted">#{idx + 1}</span>
             <input
               className="flex-1"
               placeholder="Nome (es. farina 00)"
@@ -334,7 +337,7 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
             />
             <button className="btn-ghost px-2 py-1" onClick={() => move(idx, -1)} aria-label="Sposta su">↑</button>
             <button className="btn-ghost px-2 py-1" onClick={() => move(idx, 1)} aria-label="Sposta giù">↓</button>
-            <button className="btn-ghost px-2 py-1 text-red-700" onClick={() => remove(idx)} aria-label="Rimuovi">✕</button>
+            <button className="btn-ghost px-2 py-1 text-danger" onClick={() => remove(idx)} aria-label="Rimuovi"><Icon name="close" size={16} /></button>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <input
@@ -386,7 +389,7 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
             <input placeholder="Nota (es. a cubetti)" value={ing.note} onChange={(e) => update(idx, { note: e.target.value })} />
             <input placeholder="Sezione (es. Impasto)" value={ing.section} onChange={(e) => update(idx, { section: e.target.value })} list="sections" />
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="h-4 w-4 accent-brand-700" checked={ing.optional} onChange={(e) => update(idx, { optional: e.target.checked })} />
+              <input type="checkbox" className="h-4 w-4 accent-accent" checked={ing.optional} onChange={(e) => update(idx, { optional: e.target.checked })} />
               facoltativo
             </label>
           </div>
@@ -443,13 +446,13 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
 
   return (
     <section className="space-y-3">
-      <p className="text-sm text-stone-600">
+      <p className="text-sm text-muted">
         Scrivi il passaggio e <b>inserisci gli ingredienti con i bottoni</b>: la quantità comparirà già riscalata quando cucini. Tieni premuto a lungo (o usa "solo nome") per citare l'ingrediente senza quantità.
       </p>
       {draft.steps.map((step, idx) => (
         <div key={step.id} className="card space-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-stone-500">Passo {idx + 1}</span>
+            <span className="text-sm font-semibold text-muted">Passo {idx + 1}</span>
             <select className="py-1 text-sm" value={step.type} onChange={(e) => update(idx, { type: e.target.value as StepType | '' })}>
               <option value="">tipo…</option>
               {(Object.keys(STEP_TYPE_LABELS) as StepType[]).map((t) => (
@@ -462,7 +465,7 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
             <span className="flex-1" />
             <button className="btn-ghost px-2 py-1" onClick={() => move(idx, -1)} aria-label="Sposta su">↑</button>
             <button className="btn-ghost px-2 py-1" onClick={() => move(idx, 1)} aria-label="Sposta giù">↓</button>
-            <button className="btn-ghost px-2 py-1 text-red-700" onClick={() => remove(idx)} aria-label="Rimuovi">✕</button>
+            <button className="btn-ghost px-2 py-1 text-danger" onClick={() => remove(idx)} aria-label="Rimuovi"><Icon name="close" size={16} /></button>
           </div>
           <textarea
             ref={(el) => {
@@ -484,11 +487,11 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
           />
           <div className="flex flex-wrap gap-1">
             {ingredients.map((i) => (
-              <span key={i.id} className="inline-flex overflow-hidden rounded-full border border-brand-200 text-xs">
-                <button className="bg-brand-100 px-2 py-0.5 text-brand-900 hover:bg-brand-200" onClick={() => insertRef(idx, i.id, false)} title="Inserisci con quantità">
+              <span key={i.id} className="inline-flex overflow-hidden rounded-full border border-line text-xs">
+                <button className="bg-accent-soft px-2 py-0.5 text-accent-text hover:bg-surface-3" onClick={() => insertRef(idx, i.id, false)} title="Inserisci con quantità">
                   {i.name}
                 </button>
-                <button className="bg-white px-1.5 py-0.5 text-stone-500 hover:bg-stone-100" onClick={() => insertRef(idx, i.id, true)} title="Inserisci solo il nome">
+                <button className="bg-surface px-1.5 py-0.5 text-muted hover:bg-surface-2" onClick={() => insertRef(idx, i.id, true)} title="Inserisci solo il nome">
                   n
                 </button>
               </span>
@@ -502,8 +505,8 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
             <input placeholder="Attrezzatura" value={step.equipment} onChange={(e) => update(idx, { equipment: e.target.value })} />
           </div>
           {draft.steps.length > 1 && (
-            <label className="flex items-center gap-2 text-sm text-stone-600">
-              <span>↔ Si può fare durante</span>
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <span className="inline-flex items-center gap-1"><Icon name="parallel" size={14} /> Si può fare durante</span>
               <select className="py-1 text-sm" value={step.parallelWith} onChange={(e) => update(idx, { parallelWith: e.target.value })}>
                 <option value="">nessun altro passaggio</option>
                 {draft.steps.map((o, k) =>
@@ -527,7 +530,7 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
         + Aggiungi passaggio
       </button>
       {unused.length > 0 && draft.steps.length > 0 && (
-        <p className="text-xs text-amber-800">Ingredienti non ancora citati in nessun passaggio: {unused.map((i) => i.name).join(', ')}.</p>
+        <p className="text-xs text-warning">Ingredienti non ancora citati in nessun passaggio: {unused.map((i) => i.name).join(', ')}.</p>
       )}
     </section>
   )
@@ -548,31 +551,33 @@ function PhaseReview({ recipe }: { recipe: Recipe }) {
   return (
     <section className="space-y-3">
       {problems.length > 0 && (
-        <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="notice space-y-1 bg-warning-soft text-warning">
           {problems.map((p) => (
-            <p key={p}>⚠︎ {p}</p>
+            <p key={p} className="flex items-start gap-1">
+              <Icon name="alert" size={14} className="mt-0.5" /> {p}
+            </p>
           ))}
         </div>
       )}
       <div className="card">
-        <h2 className="text-xl font-bold text-brand-900">{recipe.title}</h2>
-        <p className="text-sm text-stone-600">
+        <h2 className="text-xl font-bold text-fg">{recipe.title}</h2>
+        <p className="text-sm text-muted">
           {recipe.servings} porzioni · {recipe.ingredients.length} ingredienti · {recipe.steps.length} passaggi
         </p>
       </div>
       <div className="card">
         <h3 className="mb-2 font-semibold">Prova di scalatura: ×2</h3>
-        <p className="mb-2 text-xs text-stone-500">Controlla che le regole scelte diano quantità sensate.</p>
+        <p className="mb-2 text-xs text-muted">Controlla che le regole scelte diano quantità sensate.</p>
         <table className="w-full text-sm">
           <tbody>
             {scaled.ingredients.map((i) => {
               const d = doubled.byId.get(i.id)
               return (
-                <tr key={i.id} className="border-t border-stone-100">
+                <tr key={i.id} className="border-t border-line">
                   <td className="py-1">{i.name}</td>
-                  <td className="py-1 text-right text-stone-500">{i.scaled ? `${Math.round(i.scaled.amount * 100) / 100} ${i.scaled.unit}` : '—'}</td>
+                  <td className="py-1 text-right text-muted">{i.scaled ? `${Math.round(i.scaled.amount * 100) / 100} ${i.scaled.unit}` : '—'}</td>
                   <td className="py-1 text-right font-semibold">{d?.scaled ? `${Math.round(d.scaled.amount * 100) / 100} ${d.scaled.unit}` : '—'}</td>
-                  <td className="py-1 pl-2 text-xs text-stone-400">{SCALING_MODE_LABELS[i.scaling?.mode ?? 'linear']}</td>
+                  <td className="py-1 pl-2 text-xs text-faint">{SCALING_MODE_LABELS[i.scaling?.mode ?? 'linear']}</td>
                 </tr>
               )
             })}

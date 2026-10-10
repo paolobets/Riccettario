@@ -7,6 +7,7 @@ import { saveRecipe } from '@/data/repo'
 import { newId, type Recipe } from '@/core'
 import { useRecipeChat } from '../hooks/useRecipeChat'
 import ChatThread from './ChatThread'
+import Icon from './Icon'
 
 interface Props {
   recipe: Recipe
@@ -61,7 +62,7 @@ export default function AiPanel({ recipe, factor }: Props) {
   if (!open) {
     return (
       <button className="btn-secondary w-full" onClick={() => setOpen(true)}>
-        ✨ {chat.turns.length > 0 ? `Assistente (${chat.turns.length / 2} scambi)` : "Chiedi all'AI o crea una variante"}
+        <Icon name="sparkles" size={16} /> {chat.turns.length > 0 ? `Assistente (${chat.turns.length / 2} scambi)` : "Chiedi all'AI o crea una variante"}
       </button>
     )
   }
@@ -71,22 +72,24 @@ export default function AiPanel({ recipe, factor }: Props) {
   return (
     <section className="card space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-brand-900">✨ Assistente</h2>
+        <h2 className="inline-flex items-center gap-2 font-semibold text-fg">
+          <Icon name="sparkles" size={16} className="text-accent" /> Assistente
+        </h2>
         <div className="flex gap-1 text-sm">
-          <button className={`btn-ghost px-2 py-1 ${!variantMode ? 'bg-brand-100' : ''}`} onClick={() => setVariantMode(false)}>
+          <button className={`btn-ghost px-2 py-1 ${!variantMode ? 'bg-accent-soft' : ''}`} onClick={() => setVariantMode(false)}>
             Domande
           </button>
-          <button className={`btn-ghost px-2 py-1 ${variantMode ? 'bg-brand-100' : ''}`} onClick={() => setVariantMode(true)}>
+          <button className={`btn-ghost px-2 py-1 ${variantMode ? 'bg-accent-soft' : ''}`} onClick={() => setVariantMode(true)}>
             Variante
           </button>
           <button className="btn-ghost px-2 py-1" onClick={() => setOpen(false)} aria-label="Chiudi">
-            ✕
+            <Icon name="close" size={16} />
           </button>
         </div>
       </div>
 
       {configured === false && (
-        <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">Configura la chiave API nelle impostazioni per usare l'assistente.</p>
+        <p className="notice bg-warning-soft text-warning">Configura la chiave API nelle impostazioni per usare l'assistente.</p>
       )}
 
       {!variantMode && (
@@ -94,7 +97,7 @@ export default function AiPanel({ recipe, factor }: Props) {
           {chat.turns.length === 0 && chat.partial === null && (
             <div className="flex flex-wrap gap-2">
               {QUICK.map((q) => (
-                <button key={q} className="chip hover:bg-brand-200" onClick={() => ask(q)} disabled={busy || configured === false}>
+                <button key={q} className="chip hover:bg-surface-3" onClick={() => ask(q)} disabled={busy || configured === false}>
                   {q}
                 </button>
               ))}
@@ -118,13 +121,13 @@ export default function AiPanel({ recipe, factor }: Props) {
               Nuova conversazione
             </button>
           )}
-          {chat.error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{chat.error}</p>}
+          {chat.error && <p className="notice bg-danger-soft text-danger">{chat.error}</p>}
         </>
       )}
 
       {variantMode && (
         <div className="space-y-2">
-          <p className="text-sm text-stone-600">
+          <p className="text-sm text-muted">
             Descrivi la modifica: l'AI produce una nuova ricetta completa, salvata come variante accanto all'originale.
             {sessions.some((s) => s.notes || s.rating) && ' Tiene conto del tuo diario di cottura.'}
           </p>
@@ -139,7 +142,7 @@ export default function AiPanel({ recipe, factor }: Props) {
           <button className="btn-primary w-full" onClick={makeVariant} disabled={busy || !instruction.trim() || configured === false}>
             {variantBusy ? 'Creo la variante…' : 'Crea variante'}
           </button>
-          {variantError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{variantError}</p>}
+          {variantError && <p className="notice bg-danger-soft text-danger">{variantError}</p>}
         </div>
       )}
     </section>

@@ -65,6 +65,10 @@ Chi preferisce non tenere la chiave nel browser può pubblicare `proxy/cloudflar
 
 Il codice dell'AI è in `src/ai/` e viene caricato solo quando serve, così il resto dell'app resta leggero e offline. Ogni risposta mostra il costo reale della richiesta (dai token riportati dall'API) e in *Impostazioni* c'è il totale speso. Le conversazioni restano salvate per ricetta e sono disponibili anche in modalità cucina, dove il bottone "Chiedi" passa all'AI il passaggio corrente.
 
+## Aspetto
+
+Tema chiaro e scuro: automatico in base al dispositivo, oppure a scelta in *Impostazioni → Aspetto*. I colori sono token semantici in `src/index.css` (`--bg`, `--surface`, `--accent`…): i componenti usano solo classi come `bg-surface` o `text-muted`, quindi cambiare palette o aggiungere un tema significa toccare un solo file. Le icone sono SVG a tratto in `src/app/components/Icon.tsx`.
+
 ## Dati
 
 Le ricette vivono in IndexedDB sul dispositivo. Da *Impostazioni* si esporta e importa un file JSON. Alla prima apertura vengono caricate tre ricette di esempio (impasto per pizza, carbonara, tiramisù) che mostrano le diverse regole di scalatura.

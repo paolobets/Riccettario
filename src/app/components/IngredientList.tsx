@@ -59,8 +59,8 @@ export default function IngredientList({ scaled, onPivot, checkable }: Props) {
     <div className="space-y-4">
       {groupBySection(scaled.ingredients).map(([section, items]) => (
         <div key={section ?? '_'}>
-          {section && <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-brand-800">{section}</h3>}
-          <ul className="divide-y divide-stone-100">
+          {section && <h3 className="mb-1 text-sm font-semibold text-accent-text">{section}</h3>}
+          <ul className="divide-y divide-line">
             {items.map((ing) => {
               const isEditing = editing === ing.id
               const d = ing.scaled ? toDisplayUnit(ing.scaled) : undefined
@@ -70,7 +70,7 @@ export default function IngredientList({ scaled, onPivot, checkable }: Props) {
                   {checkable && (
                     <input
                       type="checkbox"
-                      className="mt-1.5 h-5 w-5 accent-brand-700"
+                      className="mt-1.5 h-5 w-5 accent-accent"
                       checked={done}
                       onChange={() => {
                         const next = new Set(checked)
@@ -80,10 +80,10 @@ export default function IngredientList({ scaled, onPivot, checkable }: Props) {
                       }}
                     />
                   )}
-                  <div className="w-28 shrink-0 text-right">
+                  <div className="w-30 shrink-0 text-right">
                     {d && !isEditing && (
                       <button
-                        className={`rounded px-1 font-semibold tabular-nums ${onPivot && ing.scaling?.mode !== 'fixed' && ing.scaling?.mode !== 'toTaste' ? 'text-brand-800 underline decoration-dotted hover:bg-brand-100' : 'text-stone-800'} ${ing.adjusted ? 'text-amber-700' : ''}`}
+                        className={`rounded-md px-1.5 py-0.5 font-semibold tabular-nums leading-tight transition ${onPivot && ing.scaling?.mode !== 'fixed' && ing.scaling?.mode !== 'toTaste' ? 'bg-surface-2 text-accent-text hover:bg-accent-soft' : 'text-fg'} ${ing.adjusted ? 'text-warning' : ''}`}
                         onClick={() => startEdit(ing)}
                         disabled={!onPivot}
                         title={ing.warning}
@@ -108,20 +108,20 @@ export default function IngredientList({ scaled, onPivot, checkable }: Props) {
                           onBlur={() => commit(ing)}
                           onKeyDown={(e) => e.key === 'Escape' && setEditing(null)}
                         />
-                        <span className="text-xs text-stone-500">{formatUnit(d.unit, 2)}</span>
+                        <span className="text-xs text-muted">{formatUnit(d.unit, 2)}</span>
                       </form>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className={done ? 'line-through' : ''}>
                       {ing.name}
-                      {ing.optional && <span className="text-stone-500"> (facoltativo)</span>}
+                      {ing.optional && <span className="text-muted"> (facoltativo)</span>}
                     </span>
-                    {ing.note && <span className="text-sm text-stone-500">, {ing.note}</span>}
-                    {ing.adjusted && ing.warning && <p className="text-xs text-amber-700">{ing.warning}</p>}
-                    {isEditing && error && <p className="text-xs text-red-700">{error}</p>}
+                    {ing.note && <span className="text-sm text-muted">, {ing.note}</span>}
+                    {ing.adjusted && ing.warning && <p className="text-xs text-warning">{ing.warning}</p>}
+                    {isEditing && error && <p className="text-xs text-danger">{error}</p>}
                     {ing.original && ing.scaled && Math.abs(scaled.factor - 1) > 1e-9 && (
-                      <p className="text-xs text-stone-400">
+                      <p className="text-xs text-faint">
                         originale {formatAmount(toDisplayUnit(ing.original).amount, toDisplayUnit(ing.original).unit)} {formatUnit(toDisplayUnit(ing.original).unit, toDisplayUnit(ing.original).amount)}
                       </p>
                     )}

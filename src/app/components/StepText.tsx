@@ -15,14 +15,14 @@ export default function StepText({ step, scaled, className }: Props) {
         if (s.kind === 'text') return <span key={i}>{s.text}</span>
         if (s.kind === 'missing')
           return (
-            <span key={i} className="rounded bg-red-100 px-1 text-red-800" title="Ingrediente non trovato">
+            <span key={i} className="rounded bg-danger-soft px-1 text-danger" title="Ingrediente non trovato">
               {s.text}
             </span>
           )
         return (
           <span
             key={i}
-            className={`rounded px-1 font-semibold ${s.nameOnly ? 'text-stone-800' : 'bg-brand-100 text-brand-900'} ${s.ingredient.adjusted ? 'ring-1 ring-amber-400' : ''}`}
+            className={`rounded px-1 font-semibold ${s.nameOnly ? 'text-fg' : 'bg-accent-soft text-accent-text'} ${s.ingredient.adjusted ? 'ring-1 ring-warning' : ''}`}
             title={s.ingredient.warning}
           >
             {s.text}

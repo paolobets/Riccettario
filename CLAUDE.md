@@ -7,3 +7,4 @@ PWA React + TypeScript (Vite, Tailwind v4, Dexie, react-router). Package manager
 - `src/core` non importa React né Dexie: è dominio puro.
 - Le regole di scalatura sono documentate in `docs/MODELLO-DATI.md`: aggiornarlo se cambiano.
 - Il fattore di scalatura vive nell'URL (`?f=`), non in uno store globale.
+- Colori solo tramite i token semantici di `src/index.css` (`bg-surface`, `text-muted`, `bg-accent`…): mai classi come `bg-white` o `text-stone-500`, altrimenti il tema scuro si rompe. Icone da `Icon.tsx`, niente emoji nell'interfaccia.

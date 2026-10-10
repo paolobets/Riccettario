@@ -10,6 +10,7 @@ import StepText from '../components/StepText'
 import TimerButton from '../components/TimerButton'
 import TimerBar from '../components/TimerBar'
 import CookAssistant from '../components/CookAssistant'
+import Icon from '../components/Icon'
 
 /** Tiene lo schermo acceso finché la pagina è aperta (dove il browser lo permette). */
 function useWakeLock() {
@@ -86,18 +87,18 @@ export default function CookMode() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-2xl flex-col bg-brand-50">
+    <div className="mx-auto flex min-h-screen max-w-2xl flex-col bg-bg">
       <header className="flex items-center justify-between gap-3 px-4 py-3">
         <Link to={`/ricetta/${recipe.id}${scaler.search ? `?${scaler.search}` : ''}`} className="btn-ghost px-2 py-1 text-sm">
-          ✕ Esci
+          <Icon name="close" size={16} /> Esci
         </Link>
-        <div className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-brand-900">{recipe.title}</div>
+        <div className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-accent-text">{recipe.title}</div>
         <span className="chip">
           {Math.round(scaled.servings * 100) / 100} porz. · {formatFactor(scaled.factor)}
         </span>
       </header>
-      <div className="h-1 w-full bg-brand-100">
-        <div className="h-1 bg-brand-700 transition-all" style={{ width: `${progress * 100}%` }} />
+      <div className="h-1 w-full bg-surface-3">
+        <div className="h-1 bg-accent transition-all" style={{ width: `${progress * 100}%` }} />
       </div>
       <TimerBar
         recipeId={recipe.id}
@@ -110,11 +111,11 @@ export default function CookMode() {
       <main className="flex flex-1 flex-col px-5 py-6">
         {index < 0 && (
           <section className="space-y-4">
-            <h1 className="text-2xl font-bold text-brand-900">Prima di iniziare</h1>
-            <p className="text-stone-700">Pesa e prepara tutto. Spunta man mano.</p>
+            <h1 className="text-2xl font-bold text-fg">Prima di iniziare</h1>
+            <p className="text-fg-2">Pesa e prepara tutto. Spunta man mano.</p>
             {scaled.warnings.map((w) => (
-              <p key={w} className="rounded-lg bg-stone-100 p-2 text-sm text-stone-700">
-                ⚠︎ {w}
+              <p key={w} className="notice flex items-start gap-2 bg-warning-soft text-warning">
+                <Icon name="alert" size={16} className="mt-0.5" /> <span>{w}</span>
               </p>
             ))}
             <div className="card">
@@ -122,8 +123,8 @@ export default function CookMode() {
             </div>
             {recipe.steps.some((s) => s.equipment?.length) && (
               <div className="card">
-                <h2 className="mb-1 font-semibold text-brand-900">Attrezzatura</h2>
-                <ul className="list-inside list-disc text-stone-700">
+                <h2 className="label-caps mb-1">Attrezzatura</h2>
+                <ul className="list-inside list-disc text-fg-2">
                   {[...new Set(recipe.steps.flatMap((s) => s.equipment ?? []))].map((e) => (
                     <li key={e}>{e}</li>
                   ))}
@@ -135,8 +136,8 @@ export default function CookMode() {
 
         {step && (
           <section className="flex flex-1 flex-col gap-5">
-            <div className="flex items-center gap-2 text-sm text-stone-500">
-              <span className="font-semibold text-brand-800">
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <span className="font-semibold text-accent-text">
                 Passo {index + 1} di {total}
               </span>
               {step.section && <span>· {step.section}</span>}
@@ -146,24 +147,26 @@ export default function CookMode() {
             </div>
             <StepText step={step} scaled={scaled} className="text-2xl leading-relaxed sm:text-3xl" />
             {step.equipment && step.equipment.length > 0 && (
-              <p className="text-stone-600">🍳 {step.equipment.join(', ')}</p>
+              <p className="inline-flex items-center gap-2 text-muted">
+                <Icon name="pan" size={16} /> {step.equipment.join(', ')}
+              </p>
             )}
             <div className="flex flex-wrap items-center gap-3">
               {step.timer && <TimerButton recipeId={recipe.id} stepId={step.id} timer={step.timer} size="lg" />}
               <CookAssistant recipe={recipe} factor={scaled.factor} stepContext={`passo ${index + 1} di ${total}: ${renderStepPlain(step, scaled)}`} />
             </div>
             {parallelParentIndex >= 0 && (
-              <button className="w-fit rounded-lg bg-sky-50 px-3 py-2 text-left text-sm text-sky-900" onClick={() => setIndex(parallelParentIndex)}>
-                ↔ Da fare durante il passo {parallelParentIndex + 1}. Tocca per tornarci.
+              <button className="w-fit rounded-lg bg-info-soft px-3 py-2 text-left text-sm text-info" onClick={() => setIndex(parallelParentIndex)}>
+                <Icon name="parallel" size={14} className="mr-1 inline" /> Da fare durante il passo {parallelParentIndex + 1}. Tocca per tornarci.
               </button>
             )}
             {parallel.length > 0 && (
-              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
-                <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-sky-900">Nel frattempo puoi</h2>
+              <div className="rounded-xl border border-line bg-info-soft p-3">
+                <h2 className="label-caps mb-1 text-info">Nel frattempo puoi</h2>
                 <ul className="space-y-1">
                   {parallel.map(({ step: p, index: i }) => (
                     <li key={p.id}>
-                      <button className="w-full rounded-lg px-2 py-1 text-left text-sky-900 hover:bg-sky-100" onClick={() => setIndex(i)}>
+                      <button className="w-full rounded-lg px-2 py-1 text-left text-info hover:bg-surface-2" onClick={() => setIndex(i)}>
                         <span className="font-semibold">Passo {i + 1}:</span> {renderStepPlain(p, scaled)}
                       </button>
                     </li>
@@ -173,7 +176,7 @@ export default function CookMode() {
             )}
             {stepIngredients.length > 0 && (
               <div className="card mt-auto">
-                <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-brand-800">In questo passo</h2>
+                <h2 className="label-caps mb-1">In questo passo</h2>
                 <IngredientList scaled={{ ...scaled, ingredients: stepIngredients, warnings: [] }} />
               </div>
             )}
@@ -182,11 +185,11 @@ export default function CookMode() {
 
         {isEnd && (
           <section className="space-y-4">
-            <h1 className="text-2xl font-bold text-brand-900">Fatto! 🎉</h1>
-            <p className="text-stone-700">Com'è venuta? Due righe adesso valgono oro la prossima volta.</p>
+            <h1 className="text-2xl font-bold text-fg">Fatto!</h1>
+            <p className="text-fg-2">Com'è venuta? Due righe adesso valgono oro la prossima volta.</p>
             <div className="flex gap-1 text-3xl">
               {[1, 2, 3, 4, 5].map((n) => (
-                <button key={n} onClick={() => setRating(n)} className={n <= rating ? 'text-brand-600' : 'text-stone-300'} aria-label={`${n} stelle`}>
+                <button key={n} onClick={() => setRating(n)} className={n <= rating ? 'text-accent' : 'text-faint'} aria-label={`${n} stelle`}>
                   ★
                 </button>
               ))}
@@ -202,15 +205,15 @@ export default function CookMode() {
         )}
       </main>
 
-      <footer className="sticky bottom-0 flex gap-3 border-t border-brand-200 bg-brand-50/95 px-4 py-3 backdrop-blur">
+      <footer className="sticky bottom-0 flex gap-3 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur">
         {index < 0 ? (
           <button className="btn-primary flex-1 py-3 text-lg" onClick={begin}>
             Inizia
           </button>
         ) : isEnd ? (
           <>
-            <button className="btn-secondary py-3" onClick={() => setIndex(total - 1)}>
-              ← Indietro
+            <button className="btn-secondary py-3" onClick={() => setIndex(total - 1)} aria-label="Indietro">
+              <Icon name="left" />
             </button>
             <button className="btn-primary flex-1 py-3 text-lg" onClick={finish}>
               Salva e chiudi
@@ -218,11 +221,11 @@ export default function CookMode() {
           </>
         ) : (
           <>
-            <button className="btn-secondary py-3" onClick={() => setIndex(index - 1)}>
-              ← Indietro
+            <button className="btn-secondary py-3" onClick={() => setIndex(index - 1)} aria-label="Indietro">
+              <Icon name="left" />
             </button>
             <button className="btn-primary flex-1 py-3 text-lg" onClick={() => setIndex(index + 1)}>
-              {index === total - 1 ? 'Finito' : 'Avanti →'}
+              {index === total - 1 ? 'Finito' : 'Avanti'} <Icon name="right" />
             </button>
           </>
         )}

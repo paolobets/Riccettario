@@ -12,6 +12,7 @@
 - Nome e colori dell'app in un unico file (`src/app/branding.ts`).
 - Assistente in modalità cucina (domande sul passaggio corrente), costo reale per risposta e totale in impostazioni, conversazioni salvate per ricetta.
 - Pubblicazione automatica su GitHub Pages a ogni push su main.
+- Revisione dell'interfaccia: token semantici di colore con tema chiaro/scuro (automatico o manuale), icone vettoriali, tipografia e spaziature uniformi, stati di focus visibili, animazioni ridotte se richiesto dal sistema.
 - Assistente AI: import da testo, foto e URL con output strutturato validato (zod) e revisione nel wizard; domande in streaming con contesto (ricetta, fattore, diario); varianti complete salvate accanto all'originale. Chiave sul dispositivo o proxy Cloudflare opzionale.
 
 ## Prossimi passi

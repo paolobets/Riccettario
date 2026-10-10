@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { formatDuration, totalDuration } from '@/core'
+import Icon from '../components/Icon'
 
 export default function RecipeList() {
   const recipes = useLiveQuery(() => db.recipes.orderBy('updatedAt').reverse().toArray(), [])
@@ -33,20 +34,23 @@ export default function RecipeList() {
 
   return (
     <div className="space-y-4">
-      <input
-        type="search"
-        placeholder="Cerca per titolo o ingrediente…"
-        className="w-full"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      <label className="relative block">
+        <Icon name="search" size={18} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+        <input
+          type="search"
+          placeholder="Cerca per titolo o ingrediente…"
+          className="w-full pl-10"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </label>
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          <button className={`chip ${tag === null ? 'ring-2 ring-brand-600' : ''}`} onClick={() => setTag(null)}>
+          <button className={`chip ${tag === null ? 'ring-2 ring-accent' : ''}`} onClick={() => setTag(null)}>
             tutte
           </button>
           {tags.map((t) => (
-            <button key={t} className={`chip ${tag === t ? 'ring-2 ring-brand-600' : ''}`} onClick={() => setTag(tag === t ? null : t)}>
+            <button key={t} className={`chip ${tag === t ? 'ring-2 ring-accent' : ''}`} onClick={() => setTag(tag === t ? null : t)}>
               {t}
             </button>
           ))}
@@ -54,14 +58,16 @@ export default function RecipeList() {
       )}
 
       {filtered.length === 0 && (
-        <div className="card text-center text-stone-600">
-          <p>Nessuna ricetta trovata.</p>
+        <div className="card py-10 text-center text-muted">
+          <Icon name="book" size={40} className="mx-auto mb-3 text-faint" />
+          <p className="font-medium text-fg">Nessuna ricetta trovata.</p>
+          <p className="mt-1 text-sm">Crea la prima a mano o lascia che l'AI la strutturi da un testo o una foto.</p>
           <div className="mt-3 flex justify-center gap-2">
             <Link to="/ricetta/nuova" className="btn-primary">
               Crea la prima ricetta
             </Link>
             <Link to="/importa" className="btn-secondary">
-              ✨ Importa con l'AI
+              <Icon name="sparkles" size={16} /> Importa con l'AI
             </Link>
           </div>
         </div>
@@ -72,25 +78,31 @@ export default function RecipeList() {
           const minutes = totalDuration(r.steps)
           return (
             <li key={r.id}>
-              <Link to={`/ricetta/${r.id}`} className="card block hover:border-brand-600">
-                <h2 className="text-lg font-semibold text-brand-900">{r.title}</h2>
-                {r.description && <p className="mt-1 line-clamp-2 text-sm text-stone-600">{r.description}</p>}
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-stone-500">
-                  <span>{r.servings} porzioni</span>
-                  <span>·</span>
-                  <span>{r.ingredients.length} ingredienti</span>
+              <Link to={`/ricetta/${r.id}`} className="card block transition hover:-translate-y-0.5 hover:border-accent">
+                <h2 className="text-lg font-semibold text-fg">{r.title}</h2>
+                {r.description && <p className="mt-1 line-clamp-2 text-sm text-muted">{r.description}</p>}
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                  <span className="inline-flex items-center gap-1">
+                    <Icon name="chef" size={14} /> {r.servings} porz.
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Icon name="book" size={14} /> {r.ingredients.length} ingr.
+                  </span>
                   {minutes > 0 && (
-                    <>
-                      <span>·</span>
-                      <span>{formatDuration(minutes)}</span>
-                    </>
-                  )}
-                  {r.tags.map((t) => (
-                    <span key={t} className="chip">
-                      {t}
+                    <span className="inline-flex items-center gap-1">
+                      <Icon name="timer" size={14} /> {formatDuration(minutes)}
                     </span>
-                  ))}
+                  )}
                 </div>
+                {r.tags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {r.tags.map((t) => (
+                      <span key={t} className="chip">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </Link>
             </li>
           )
