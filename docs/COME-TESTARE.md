@@ -15,12 +15,16 @@ Le ricette vivono nel browser del dispositivo: telefono e computer hanno archivi
 - [ ] Tocca la quantità della farina, scrivi `300` e conferma: tutta la ricetta si riproporziona (fattore ×0,6).
 - [ ] Apri "Spaghetti alla carbonara", porta a 3 porzioni: i tuorli diventano 5 con avviso arancione (lineare sarebbe 4,5). Compare il suggerimento dei fattori "fattibili".
 - [ ] Ripristina (bottone accanto al fattore).
+- [ ] In fondo alla ricetta, "Aggiungi una nota": scrivi due righe e salva. Restano anche dopo aver ricaricato.
+- [ ] Elimina una ricetta duplicata: la finestra di conferma ha "Tieni" ed "Elimina ricetta", Escape la chiude.
 
 ### 2. Modalità cucina
 - [ ] Dalla carbonara, "Cucina passo per passo". Spunta gli ingredienti nella mise en place, poi "Inizia".
 - [ ] Al passo 1 compare "Nel frattempo puoi" con i passi 2 e 3: toccane uno, poi usa il rimando per tornare al passo 1.
 - [ ] Al passo 4 avvia il timer "Pasta". Torna indietro: il timer resta nella barra in alto. Chiudi la scheda e riaprila: il timer c'è ancora.
-- [ ] Arriva in fondo, dai un voto e una nota, salva: compaiono nel "Diario di cottura" della ricetta.
+- [ ] Ricarica la pagina a metà cottura: si riparte dallo stesso passo (è nell'indirizzo, `?passo=`). Tocca "Passo N di M" per saltare a un altro passo.
+- [ ] "Esci" chiede conferma; "Resta in cucina" non perde nulla.
+- [ ] Arriva in fondo, dai un voto e una nota, salva: compaiono nel "Diario di cottura" della ricetta. Una cottura abbandonata con "Esci" non compare.
 
 ### 3. Wizard
 - [ ] "+ Nuova": inserisci titolo e porzioni, due ingredienti (uno "a pezzi interi"), un passaggio inserendo gli ingredienti con i bottoni sotto al testo.

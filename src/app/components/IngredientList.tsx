@@ -95,7 +95,7 @@ export default function IngredientList({ scaled, onPivot, checkable, storageKey 
       {groupBySection(scaled.ingredients).map(([section, items]) => (
         <div key={section ?? '_'}>
           {section && <h3 className="mb-1 text-sm font-semibold text-accent-text">{section}</h3>}
-          <ul className="divide-y divide-line">
+          <ul className={`grid divide-y divide-line ${checkable ? 'grid-cols-[auto_max-content_1fr]' : 'grid-cols-[max-content_1fr]'}`}>
             {items.map((ing) => {
               const isEditing = editing === ing.id
               const d = ing.scaled ? toDisplayUnit(ing.scaled) : undefined
@@ -104,8 +104,11 @@ export default function IngredientList({ scaled, onPivot, checkable, storageKey 
               const showOriginal = isScaled && ing.original && ing.scaled && isPivotable(ing)
               const Row = checkable ? 'label' : 'div'
               return (
-                <li key={ing.id}>
-                  <Row className={`flex items-start gap-3 ${checkable ? 'cursor-pointer py-3' : 'py-2'} ${done ? 'opacity-50' : ''}`}>
+                <li
+                  key={ing.id}
+                  className={`col-span-full grid grid-cols-subgrid items-start gap-x-3 ${checkable ? 'cursor-pointer py-3' : 'py-2'} ${done ? 'opacity-50' : ''}`}
+                >
+                  <Row className="contents">
                     {checkable && (
                       <input
                         type="checkbox"
@@ -115,7 +118,7 @@ export default function IngredientList({ scaled, onPivot, checkable, storageKey 
                         aria-label={`${ing.name}${d ? `, ${formatQuantity(d)}` : ''}`}
                       />
                     )}
-                    <div className="w-30 shrink-0 text-right">
+                    <div className="text-right">
                       {d && !isEditing && pivotable && (
                         <button
                           className="qty inline-flex min-h-8 items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-[17px] leading-tight font-semibold text-accent-text transition hover:bg-accent-soft"

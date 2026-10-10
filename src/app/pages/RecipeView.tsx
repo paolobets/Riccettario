@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
-import { deleteRecipe, duplicateRecipe } from '@/data/repo'
+import { deleteRecipe, duplicateRecipe, saveRecipe } from '@/data/repo'
 import { activeDuration, formatDuration, STEP_TYPE_LABELS, totalDuration } from '@/core'
 import { useScaler } from '../hooks/useScaler'
 import ScalerPanel from '../components/ScalerPanel'
@@ -10,6 +11,7 @@ import StepText from '../components/StepText'
 import TimerButton from '../components/TimerButton'
 import AiPanel from '../components/AiPanel'
 import Icon from '../components/Icon'
+import { useConfirm } from '../components/ConfirmDialog'
 import NotFound from './NotFound'
 
 function Stars({ rating }: { rating: number }) {
@@ -32,6 +34,9 @@ export default function RecipeView() {
     [id],
   )
   const scaler = useScaler(recipe ?? undefined)
+  const { confirm, dialog } = useConfirm()
+  /** Testo della nota in modifica; `null` quando non si sta modificando. */
+  const [notesDraft, setNotesDraft] = useState<string | null>(null)
 
   if (recipe === undefined) return null
   if (recipe === null || !scaler.scaled) return <NotFound what="ricetta" />
@@ -40,8 +45,16 @@ export default function RecipeView() {
   const active = activeDuration(recipe.steps)
   const cookLink = `/ricetta/${recipe.id}/cucina${scaler.search ? `?${scaler.search}` : ''}`
 
+  const saveNotes = async () => {
+    if (notesDraft === null) return
+    const notes = notesDraft.trim() || undefined
+    if (notes !== recipe.notes) await saveRecipe({ ...recipe, notes })
+    setNotesDraft(null)
+  }
+
   return (
     <article className="space-y-5">
+      {dialog}
       <header className="space-y-2">
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-4xl font-medium leading-tight text-fg">{recipe.title}</h1>
@@ -65,7 +78,14 @@ export default function RecipeView() {
               className="btn-ghost min-h-10 px-2 py-1.5 text-sm text-danger"
               aria-label="Elimina"
               onClick={async () => {
-                if (confirm(`Eliminare "${recipe.title}"? Spariscono anche diario e conversazioni; non si può annullare.`)) {
+                const ok = await confirm({
+                  title: `Eliminare «${recipe.title}»?`,
+                  body: 'Spariscono anche il diario di cottura e le conversazioni. Non si può annullare.',
+                  confirmLabel: 'Elimina ricetta',
+                  cancelLabel: 'Tieni',
+                  danger: true,
+                })
+                if (ok) {
                   await deleteRecipe(recipe.id)
                   navigate('/')
                 }
@@ -154,12 +174,49 @@ export default function RecipeView() {
         </ol>
       </section>
 
-      {recipe.notes && (
-        <section className="rule pt-4">
-          <h2 className="section-title mb-1">Note</h2>
-          <p className="whitespace-pre-wrap text-fg-2">{recipe.notes}</p>
-        </section>
-      )}
+      <section className="rule pt-4">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <h2 className="section-title">Note</h2>
+          {notesDraft === null && (
+            <button className="btn-ghost min-h-9 px-2 py-1 text-sm" onClick={() => setNotesDraft(recipe.notes ?? '')}>
+              <Icon name="edit" size={16} /> {recipe.notes ? 'Modifica' : 'Aggiungi una nota'}
+            </button>
+          )}
+        </div>
+        {notesDraft === null ? (
+          recipe.notes ? (
+            <p className="whitespace-pre-wrap text-fg-2">{recipe.notes}</p>
+          ) : (
+            <p className="text-sm text-muted">Trucchi, sostituzioni, cosa fare diversamente la prossima volta. Restano con la ricetta.</p>
+          )
+        ) : (
+          <form
+            className="space-y-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              saveNotes()
+            }}
+          >
+            <textarea
+              autoFocus
+              className="w-full"
+              rows={4}
+              aria-label="Note sulla ricetta"
+              placeholder="Es. con farina più forte si può salire al 70% di idratazione"
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button type="submit" className="btn-primary">
+                Salva nota
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setNotesDraft(null)}>
+                Annulla
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
 
       {sessions && sessions.length > 0 && (
         <section className="rule pt-4">

@@ -21,6 +21,7 @@ import {
 } from '@/core'
 import StepText from '../components/StepText'
 import Icon from '../components/Icon'
+import { useConfirm } from '../components/ConfirmDialog'
 
 type Phase = 0 | 1 | 2 | 3
 const PHASES = ['Ricetta', 'Ingredienti', 'Passaggi', 'Riepilogo']
@@ -171,6 +172,7 @@ export default function RecipeWizard() {
   const [base, setBase] = useState<Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>>(() => (prefill.recipe ? { id: prefill.recipe.id, createdAt: prefill.recipe.createdAt, updatedAt: prefill.recipe.updatedAt } : emptyRecipe()))
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(Boolean(prefill.recipe))
+  const { confirm, dialog } = useConfirm()
 
   useEffect(() => {
     if (!id) return
@@ -187,8 +189,17 @@ export default function RecipeWizard() {
     setDraft({ ...draft, ...patch })
     setDirty(true)
   }
-  const cancel = () => {
-    if (dirty && !confirm('Scartare le modifiche? Quello che hai scritto in questa scheda andrà perso.')) return
+  const cancel = async () => {
+    if (dirty) {
+      const ok = await confirm({
+        title: 'Scartare le modifiche?',
+        body: 'Quello che hai scritto in questa scheda andrà perso.',
+        confirmLabel: 'Scarta',
+        cancelLabel: 'Continua a scrivere',
+        danger: true,
+      })
+      if (!ok) return
+    }
     navigate(id ? `/ricetta/${id}` : '/')
   }
 
@@ -203,6 +214,7 @@ export default function RecipeWizard() {
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-medium text-fg">{id ? 'Modifica ricetta' : prefill.fromAi ? 'Ricetta importata' : 'Nuova ricetta'}</h1>
         <button className="btn-ghost min-h-10 px-2 py-1 text-sm" onClick={cancel}>

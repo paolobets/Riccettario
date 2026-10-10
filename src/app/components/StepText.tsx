@@ -6,10 +6,12 @@ interface Props {
   className?: string
   /** Elemento contenitore: `h1` in modalità cucina, dove il passaggio è il titolo della schermata. */
   as?: 'p' | 'h1' | 'span'
+  /** `display`: testo grande in cucina, quantità in colore senza riquadro. */
+  variant?: 'inline' | 'display'
 }
 
 /** Testo del passaggio con le quantità riscalate evidenziate. */
-export default function StepText({ step, scaled, className, as: Tag = 'p' }: Props) {
+export default function StepText({ step, scaled, className, as: Tag = 'p', variant = 'inline' }: Props) {
   const segments = renderStep(step, scaled)
   return (
     <Tag className={className}>
@@ -24,7 +26,7 @@ export default function StepText({ step, scaled, className, as: Tag = 'p' }: Pro
         return (
           <span
             key={i}
-            className={`font-semibold ${s.nameOnly ? 'text-fg' : 'rounded-sm bg-accent-soft px-1 text-accent-text'} ${s.ingredient.adjusted ? 'underline decoration-warning decoration-2 underline-offset-2' : ''}`}
+            className={`font-semibold ${s.nameOnly ? 'text-fg' : variant === 'display' ? 'text-accent-text' : 'rounded-sm bg-accent-soft px-1 text-accent-text'} ${s.ingredient.adjusted ? 'underline decoration-warning decoration-2 underline-offset-4' : ''}`}
             title={s.ingredient.warning}
           >
             {s.text}

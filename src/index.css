@@ -177,6 +177,14 @@ a:focus-visible {
   outline-offset: 2px;
   border-radius: 0.5rem;
 }
+
+dialog {
+  @apply m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-line bg-surface p-5 text-fg;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.25);
+}
+dialog::backdrop {
+  background: rgb(20 20 18 / 0.45);
+}
 }
 
 @utility btn {
@@ -187,6 +195,9 @@ a:focus-visible {
 }
 @utility btn-secondary {
   @apply btn border border-line bg-surface text-fg hover:bg-surface-2;
+}
+@utility btn-danger {
+  @apply btn bg-danger text-on-accent hover:opacity-90;
 }
 @utility btn-ghost {
   @apply btn text-accent-text hover:bg-accent-soft;

@@ -11,6 +11,7 @@ import TimerButton from '../components/TimerButton'
 import TimerBar from '../components/TimerBar'
 import CookAssistant from '../components/CookAssistant'
 import Icon from '../components/Icon'
+import { useConfirm } from '../components/ConfirmDialog'
 import NotFound from './NotFound'
 
 /** Tiene lo schermo acceso finché la pagina è aperta (dove il browser lo permette). */
@@ -65,6 +66,7 @@ export default function CookMode() {
   const scaler = useScaler(recipe ?? undefined)
   const [rating, setRating] = useState(0)
   const [notes, setNotes] = useState('')
+  const { confirm, dialog } = useConfirm()
   useWakeLock()
 
   const total = recipe?.steps.length ?? 0
@@ -94,7 +96,7 @@ export default function CookMode() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
-      if (document.querySelector('[role="dialog"]')) return
+      if (document.querySelector('dialog[open], [role="dialog"]')) return
       if (e.key === 'ArrowRight' || e.key === ' ') {
         e.preventDefault()
         setIndex((i) => i + 1)
@@ -136,8 +138,16 @@ export default function CookMode() {
     setIndex(0)
   }
 
-  const exit = () => {
-    if (index >= 0 && !isEnd && !confirm('Uscire dalla cottura? Riaprendola si riparte dalla preparazione degli ingredienti.')) return
+  const exit = async () => {
+    if (index >= 0 && !isEnd) {
+      const ok = await confirm({
+        title: 'Uscire dalla cottura?',
+        body: 'Riaprendola si riparte dalla preparazione degli ingredienti. I timer avviati continuano.',
+        confirmLabel: 'Esci',
+        cancelLabel: 'Resta in cucina',
+      })
+      if (!ok) return
+    }
     saveStartedAt(recipe.id, null)
     navigate(recipeLink)
   }
@@ -178,6 +188,7 @@ export default function CookMode() {
         }}
       />
 
+      {dialog}
       <main className="flex flex-1 flex-col px-5 py-6">
         {index < 0 && (
           <section className="space-y-4">
@@ -237,7 +248,7 @@ export default function CookMode() {
                 </span>
               )}
             </div>
-            <StepText as="h1" step={step} scaled={scaled} className="font-display text-[28px] leading-snug font-normal sm:text-4xl" />
+            <StepText as="h1" variant="display" step={step} scaled={scaled} className="font-display text-[32px] leading-[1.2] font-normal tracking-[-0.01em] text-fg sm:text-[40px]" />
             {step.equipment && step.equipment.length > 0 && (
               <p className="inline-flex items-center gap-2 text-muted">
                 <Icon name="pan" size={16} /> {step.equipment.join(', ')}
