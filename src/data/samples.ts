@@ -45,9 +45,9 @@ export const sampleRecipes: Recipe[] = [
       { id: 'sale', name: 'sale grosso per l\'acqua', quantity: { amount: 1, unit: 'q.b.' }, scaling: { mode: 'toTaste' } },
     ],
     steps: [
-      { id: 's1', text: 'Porta a bollore abbondante acqua con {sale}.', type: 'prep', durationMin: 10, equipment: ['pentola grande'] },
-      { id: 's2', text: 'Taglia {guanciale} a listarelle e rosolalo in padella a fuoco medio senza grassi aggiunti, finché croccante.', type: 'cook', durationMin: 8, equipment: ['padella'] },
-      { id: 's3', text: 'In una ciotola sbatti {tuorli} con {pecorino} e {pepe} fino a ottenere una crema.', type: 'prep', durationMin: 3 },
+      { id: 's1', text: 'Porta a bollore abbondante acqua con {sale|nome}.', type: 'prep', durationMin: 10, equipment: ['pentola grande'] },
+      { id: 's2', text: 'Taglia {guanciale} a listarelle e rosolalo in padella a fuoco medio senza grassi aggiunti, finché croccante.', type: 'cook', durationMin: 8, equipment: ['padella'], parallelWith: 's1' },
+      { id: 's3', text: 'In una ciotola sbatti {tuorli} con {pecorino} e {pepe} fino a ottenere una crema.', type: 'prep', durationMin: 3, parallelWith: 's1' },
       { id: 's4', text: 'Cuoci {spaghetti} e scolali al dente tenendo un bicchiere di acqua di cottura.', type: 'cook', timer: { minutes: 9, label: 'Pasta' } },
       { id: 's5', text: 'Spegni il fuoco sotto la padella. Unisci la pasta al {guanciale|nome}, poi versa la crema di {tuorli|nome} e manteca velocemente con poca acqua di cottura.', type: 'cook', durationMin: 2 },
       { id: 's6', text: 'Servi subito con altro {pecorino|nome} e {pepe|nome}.', type: 'serve' },

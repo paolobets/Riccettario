@@ -51,6 +51,13 @@ export function renderStepPlain(step: Step, scaled: ScaledRecipe): string {
     .join('')
 }
 
+/** Passaggi che possono essere svolti mentre `stepId` è in corso (riposo, attesa, cottura lunga). */
+export function parallelStepsFor(steps: Step[], stepId: string): Array<{ step: Step; index: number }> {
+  return steps
+    .map((step, index) => ({ step, index }))
+    .filter(({ step }) => step.parallelWith === stepId)
+}
+
 /** Durata totale indicativa della ricetta (somma delle durate dei passaggi). */
 export function totalDuration(steps: Step[]): number {
   return steps.reduce((acc, s) => acc + (s.durationMin ?? s.timer?.minutes ?? 0), 0)

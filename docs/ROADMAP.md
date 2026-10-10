@@ -7,12 +7,13 @@
 - Modalità cucina: mise en place con checklist, un passo per schermata, quantità riscalate nel testo, timer con notifica e suono, schermo sempre acceso, frecce da tastiera, diario di fine cottura con voto e note.
 - Wizard in quattro fasi (ricetta, ingredienti con regola di scalatura, passaggi con inserimento degli ingredienti al cursore, riepilogo con prova ×2).
 - Varianti (duplica ricetta), export/import JSON, PWA offline.
+- Timer multipli persistenti (barra sempre visibile, sopravvivono al ricaricamento, tocco per saltare al passaggio).
+- Passaggi paralleli (`parallelWith`): "nel frattempo puoi" in modalità cucina, selezione nel wizard.
+- Nome e colori dell'app in un unico file (`src/app/branding.ts`).
 
 ## Prossimi passi
 
 ### Uso quotidiano
-- Timer multipli persistenti tra i passaggi (barra timer sempre visibile).
-- Passaggi paralleli (`parallelWith`): "mentre riposa, prepara il sugo".
 - Comandi vocali in modalità cucina (push-to-talk: avanti, indietro, ripeti, timer).
 - Vista "percentuali del panettiere" per i lievitati.
 - Conversione unità (tazze ↔ grammi per ingredienti noti).

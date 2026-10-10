@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { scaleRecipe } from '../scaling'
-import { ingredientIdsInStep, renderStep, renderStepPlain, totalDuration } from '../steps'
+import { ingredientIdsInStep, parallelStepsFor, renderStep, renderStepPlain, totalDuration } from '../steps'
 import { pane } from './fixtures'
 
 describe('steps', () => {
@@ -16,6 +16,15 @@ describe('steps', () => {
     const r = scaleRecipe(pane, 1)
     const segs = renderStep({ id: 'x', text: 'Usa {burro}.' }, r)
     expect(segs[1]).toMatchObject({ kind: 'missing', id: 'burro' })
+  })
+  it('trova i passaggi paralleli', () => {
+    const steps = [
+      { id: 'a', text: 'Riposa', type: 'rest' as const },
+      { id: 'b', text: 'Prepara il sugo', parallelWith: 'a' },
+      { id: 'c', text: 'Impiatta' },
+    ]
+    expect(parallelStepsFor(steps, 'a').map((p) => [p.step.id, p.index])).toEqual([['b', 1]])
+    expect(parallelStepsFor(steps, 'c')).toEqual([])
   })
   it('somma le durate', () => {
     expect(totalDuration(pane.steps)).toBe(70)

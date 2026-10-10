@@ -83,9 +83,17 @@ interface Step {
   equipment?: string[]
   timer?: { minutes: number; label?: string }
   section?: string
-  parallelWith?: string       // previsto: passaggio che può correre in parallelo
+  parallelWith?: string       // id del passaggio durante il quale si può svolgere (es. un riposo)
 }
 ```
+
+### Passaggi paralleli
+
+`parallelWith` indica che il passaggio si può svolgere mentre un altro è in corso (un riposo, una cottura lunga, l'acqua che bolle). In modalità cucina il passaggio "padre" mostra il riquadro *Nel frattempo puoi* con i passaggi paralleli, e questi mostrano un rimando al padre. L'ordine dei passaggi resta lineare: il parallelismo è un suggerimento di navigazione, non un grafo di dipendenze.
+
+### Timer
+
+I timer avviati (da lettura o da modalità cucina) vivono in un unico store persistito in `localStorage` (`src/app/timers/store.tsx`), identificati da `ricetta:passaggio`. Una barra sempre visibile li mostra tutti; toccandone uno in modalità cucina si salta al passaggio. Il conto alla rovescia usa un timestamp di fine, quindi regge a ricaricamenti e sospensioni del tab.
 
 `renderStep` in `steps.ts` sostituisce i riferimenti con la quantità già scalata ("350 g di acqua"), così lettura e modalità cucina mostrano sempre i numeri giusti.
 

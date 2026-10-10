@@ -122,7 +122,10 @@ export default function RecipeView() {
                           {step.durationMin && <span>{formatDuration(step.durationMin)}</span>}
                           {step.temperatureC && <span>{step.temperatureC} °C</span>}
                           {step.equipment?.map((e) => <span key={e}>🍳 {e}</span>)}
-                          {step.timer && <TimerButton timer={step.timer} />}
+                          {step.timer && <TimerButton recipeId={recipe.id} stepId={step.id} timer={step.timer} />}
+                          {step.parallelWith && (
+                            <span className="chip bg-sky-100 text-sky-900">↔ durante il passo {recipe.steps.findIndex((s) => s.id === step.parallelWith) + 1}</span>
+                          )}
                         </div>
                       </div>
                     </li>

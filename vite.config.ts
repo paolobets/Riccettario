@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
+import { APP_DESCRIPTION, APP_NAME, BACKGROUND_COLOR, THEME_COLOR } from './src/app/branding'
 
 export default defineConfig({
   plugins: [
@@ -12,11 +13,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Ricettario',
-        short_name: 'Ricettario',
-        description: 'Ricette con configuratore di quantità e assistente di cottura',
-        theme_color: '#b45309',
-        background_color: '#fffbeb',
+        name: APP_NAME,
+        short_name: APP_NAME,
+        description: APP_DESCRIPTION,
+        theme_color: THEME_COLOR,
+        background_color: BACKGROUND_COLOR,
         display: 'standalone',
         lang: 'it',
         icons: [

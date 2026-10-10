@@ -46,13 +46,14 @@ interface StepDraft {
   timerLabel: string
   equipment: string
   section: string
+  parallelWith: string
 }
 
 function emptyIngredient(): IngredientDraft {
   return { id: newId('i'), name: '', amount: '', unit: 'g', mode: 'linear', percent: '', of: '', note: '', section: '', optional: false }
 }
 function emptyStep(): StepDraft {
-  return { id: newId('s'), text: '', type: '', durationMin: '', temperatureC: '', timerMinutes: '', timerLabel: '', equipment: '', section: '' }
+  return { id: newId('s'), text: '', type: '', durationMin: '', temperatureC: '', timerMinutes: '', timerLabel: '', equipment: '', section: '', parallelWith: '' }
 }
 
 function fromRecipe(r: Recipe) {
@@ -87,6 +88,7 @@ function fromRecipe(r: Recipe) {
       timerLabel: s.timer?.label ?? '',
       equipment: s.equipment?.join(', ') ?? '',
       section: s.section ?? '',
+      parallelWith: s.parallelWith ?? '',
     })),
   }
 }
@@ -137,6 +139,7 @@ function toRecipe(d: Draft, base: Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>
         timer: timerMinutes ? { minutes: timerMinutes, label: s.timerLabel.trim() || undefined } : undefined,
         equipment: s.equipment.split(',').map((e) => e.trim()).filter(Boolean),
         section: s.section.trim() || undefined,
+        parallelWith: s.parallelWith && d.steps.some((o) => o.id === s.parallelWith && o.id !== s.id) ? s.parallelWith : undefined,
       }
     })
   const sections = [...new Set([...ingredients, ...steps].map((x) => x.section).filter((x): x is string => Boolean(x)))]
@@ -485,6 +488,21 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
             <input placeholder="Nome timer" value={step.timerLabel} onChange={(e) => update(idx, { timerLabel: e.target.value })} />
             <input placeholder="Attrezzatura" value={step.equipment} onChange={(e) => update(idx, { equipment: e.target.value })} />
           </div>
+          {draft.steps.length > 1 && (
+            <label className="flex items-center gap-2 text-sm text-stone-600">
+              <span>↔ Si può fare durante</span>
+              <select className="py-1 text-sm" value={step.parallelWith} onChange={(e) => update(idx, { parallelWith: e.target.value })}>
+                <option value="">nessun altro passaggio</option>
+                {draft.steps.map((o, k) =>
+                  o.id === step.id ? null : (
+                    <option key={o.id} value={o.id}>
+                      passo {k + 1}{o.timerMinutes ? ` (timer ${o.timerMinutes} min)` : ''}{o.type ? ` · ${STEP_TYPE_LABELS[o.type]}` : ''}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+          )}
         </div>
       ))}
       <datalist id="sections">

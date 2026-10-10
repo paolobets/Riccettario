@@ -4,7 +4,7 @@ App ricettario personale, installabile come PWA e funzionante offline, con tre i
 
 1. **Ricette strutturate**: ingredienti con quantità tipizzate e passaggi che citano gli ingredienti per id, così ogni passaggio mostra sempre la quantità giusta.
 2. **Configuratore di quantità**: si cambiano le porzioni, la resa totale, oppure *un singolo ingrediente* ("ho solo 300 g di farina") e tutta la ricetta si adatta. La scalatura non è ingenuamente lineare: sale e lievito crescono meno, le uova restano intere, le percentuali del panettiere seguono la farina.
-3. **Modalità cucina**: un passaggio per schermata, caratteri grandi, timer con notifica, schermo sempre acceso, checklist di mise en place e diario di fine cottura.
+3. **Modalità cucina**: un passaggio per schermata, caratteri grandi, timer multipli sempre visibili e persistenti, passaggi paralleli ("nel frattempo puoi"), schermo sempre acceso, checklist di mise en place e diario di fine cottura.
 
 L'integrazione con un modello AI (import da foto/testo, valutazione di varianti, evoluzione delle ricette) è prevista nella [roadmap](docs/ROADMAP.md).
 
@@ -31,6 +31,8 @@ src/
     pages/     RecipeList, RecipeView (lettura + configuratore), CookMode, RecipeWizard, Settings
     components/ScalerPanel, IngredientList, StepText, TimerButton, Layout
     hooks/     useScaler (fattore nell'URL, `?f=1.5`)
+    timers/    store dei timer attivi, persistito in localStorage
+    branding.ts nome, descrizione e colori dell'app
 docs/
   MODELLO-DATI.md  schema della ricetta e regole di scalatura
   ROADMAP.md       prossimi passi

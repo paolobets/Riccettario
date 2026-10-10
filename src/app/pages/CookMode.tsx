@@ -3,11 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { finishSession, startSession } from '@/data/repo'
-import { formatDuration, formatFactor, ingredientIdsInStep, STEP_TYPE_LABELS } from '@/core'
+import { formatDuration, formatFactor, ingredientIdsInStep, parallelStepsFor, renderStepPlain, STEP_TYPE_LABELS } from '@/core'
 import { useScaler } from '../hooks/useScaler'
 import IngredientList from '../components/IngredientList'
 import StepText from '../components/StepText'
 import TimerButton from '../components/TimerButton'
+import TimerBar from '../components/TimerBar'
 
 /** Tiene lo schermo acceso finché la pagina è aperta (dove il browser lo permette). */
 function useWakeLock() {
@@ -56,6 +57,8 @@ export default function CookMode() {
 
   const scaled = scaler.scaled
   const step = recipe && index >= 0 ? recipe.steps[index] : undefined
+  const parallel = useMemo(() => (recipe && step ? parallelStepsFor(recipe.steps, step.id) : []), [recipe, step])
+  const parallelParentIndex = step?.parallelWith ? (recipe?.steps.findIndex((s) => s.id === step.parallelWith) ?? -1) : -1
   const stepIngredients = useMemo(() => {
     if (!step || !scaled) return []
     return ingredientIdsInStep(step)
@@ -95,6 +98,13 @@ export default function CookMode() {
       <div className="h-1 w-full bg-brand-100">
         <div className="h-1 bg-brand-700 transition-all" style={{ width: `${progress * 100}%` }} />
       </div>
+      <TimerBar
+        recipeId={recipe.id}
+        onSelect={(t) => {
+          const i = recipe.steps.findIndex((s) => s.id === t.stepId)
+          if (i >= 0) setIndex(i)
+        }}
+      />
 
       <main className="flex flex-1 flex-col px-5 py-6">
         {index < 0 && (
@@ -139,7 +149,26 @@ export default function CookMode() {
             )}
             {step.timer && (
               <div>
-                <TimerButton key={step.id} timer={step.timer} size="lg" />
+                <TimerButton recipeId={recipe.id} stepId={step.id} timer={step.timer} size="lg" />
+              </div>
+            )}
+            {parallelParentIndex >= 0 && (
+              <button className="w-fit rounded-lg bg-sky-50 px-3 py-2 text-left text-sm text-sky-900" onClick={() => setIndex(parallelParentIndex)}>
+                ↔ Da fare durante il passo {parallelParentIndex + 1}. Tocca per tornarci.
+              </button>
+            )}
+            {parallel.length > 0 && (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
+                <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-sky-900">Nel frattempo puoi</h2>
+                <ul className="space-y-1">
+                  {parallel.map(({ step: p, index: i }) => (
+                    <li key={p.id}>
+                      <button className="w-full rounded-lg px-2 py-1 text-left text-sky-900 hover:bg-sky-100" onClick={() => setIndex(i)}>
+                        <span className="font-semibold">Passo {i + 1}:</span> {renderStepPlain(p, scaled)}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
             {stepIngredients.length > 0 && (
