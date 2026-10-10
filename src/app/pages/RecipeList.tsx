@@ -47,6 +47,11 @@ export default function RecipeList() {
           onChange={(e) => setQuery(e.target.value)}
         />
       </label>
+      {recipes.length > 0 && (
+        <Link to="/cosa-preparo" className="btn-secondary w-full">
+          <Icon name="chef" size={18} /> Cosa preparo oggi?
+        </Link>
+      )}
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filtra per tag">
           <button className={`chip-button ${tag === null ? 'bg-accent text-on-accent hover:bg-accent-strong' : ''}`} aria-pressed={tag === null} onClick={() => setTag(null)}>

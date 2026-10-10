@@ -1,15 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { isAiConfigured, loadAiSettings } from '@/ai/settings'
 import Icon from '../components/Icon'
 
-type Mode = 'text' | 'photo' | 'url'
+type Mode = 'text' | 'photo' | 'url' | 'dish'
+
+const MODES: Array<[Mode, string]> = [
+  ['text', 'Testo'],
+  ['photo', 'Foto'],
+  ['url', 'Sito'],
+  ['dish', 'Piatto'],
+]
 
 export default function ImportPage() {
   const navigate = useNavigate()
-  const [mode, setMode] = useState<Mode>('text')
+  const [params] = useSearchParams()
+  // `?piatto=vitello tonnato` arriva da "Cosa preparo?" quando l'AI propone un piatto nuovo.
+  const prefilledDish = params.get('piatto') ?? ''
+  const [mode, setMode] = useState<Mode>(prefilledDish ? 'dish' : 'text')
   const [text, setText] = useState('')
   const [url, setUrl] = useState('')
+  const [dish, setDish] = useState(prefilledDish)
   const [files, setFiles] = useState<File[]>([])
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -24,13 +35,14 @@ export default function ImportPage() {
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files])
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews])
 
-  const canRun = mode === 'text' ? text.trim().length > 20 : mode === 'url' ? /^https?:\/\//.test(url.trim()) : files.length > 0
+  const canRun =
+    mode === 'text' ? text.trim().length > 20 : mode === 'url' ? /^https?:\/\//.test(url.trim()) : mode === 'dish' ? dish.trim().length > 2 : files.length > 0
 
   const run = async () => {
     setError(null)
     setStatus('Avvio…')
     try {
-      const input = mode === 'text' ? { text } : mode === 'url' ? { url } : { images: files }
+      const input = mode === 'text' ? { text } : mode === 'url' ? { url } : mode === 'dish' ? { dish } : { images: files }
       const { importRecipe } = await import('@/ai/import')
       const result = await importRecipe(input, setStatus)
       navigate('/ricetta/nuova', { state: { recipe: result.recipe, warnings: result.warnings, fromAi: true, costUsd: result.costUsd } })
@@ -45,7 +57,8 @@ export default function ImportPage() {
     <div className="space-y-4">
       <h1 className="text-3xl font-medium text-fg">Importa con l'AI</h1>
       <p className="text-sm text-muted">
-        Incolla il testo di una ricetta, fotografa una pagina o indica un indirizzo web. L'AI la trasforma in una ricetta strutturata con le regole di scalatura; poi la rivedi nel wizard prima di salvarla.
+        Incolla il testo di una ricetta, fotografa una pagina, indica un sito, oppure scrivi il nome di un piatto e l'AI scrive la ricetta. In ogni caso la
+        rivedi nel wizard prima di salvarla.
       </p>
 
       {configured === false && (
@@ -59,16 +72,10 @@ export default function ImportPage() {
       )}
 
       <div className="flex gap-1 rounded-xl bg-surface-2 p-1" role="group" aria-label="Sorgente">
-        {(
-          [
-            ['text', 'Testo'],
-            ['photo', 'Foto'],
-            ['url', 'Indirizzo web'],
-          ] as Array<[Mode, string]>
-        ).map(([m, label]) => (
+        {MODES.map(([m, label]) => (
           <button
             key={m}
-            className={`min-h-10 flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${mode === m ? 'bg-surface text-fg shadow-sm' : 'text-muted'}`}
+            className={`min-h-10 min-w-0 flex-1 rounded-lg px-2 py-2 text-sm font-medium transition ${mode === m ? 'bg-surface text-fg shadow-sm' : 'text-muted'}`}
             aria-pressed={mode === m}
             onClick={() => setMode(m)}
           >
@@ -90,6 +97,24 @@ export default function ImportPage() {
 
       {mode === 'url' && (
         <input className="w-full" type="url" placeholder="https://…" aria-label="Indirizzo web della ricetta" value={url} onChange={(e) => setUrl(e.target.value)} />
+      )}
+
+      {mode === 'dish' && (
+        <div className="space-y-2">
+          <input
+            className="w-full text-lg"
+            placeholder="Es. vitello tonnato, oppure ramen di pollo per 2"
+            aria-label="Nome del piatto"
+            value={dish}
+            autoFocus={!prefilledDish}
+            onChange={(e) => setDish(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && canRun && status === null && run()}
+          />
+          <p className="text-xs text-muted">
+            L'AI scrive la ricetta a memoria, nella versione classica: controlla dosi e tempi nel riepilogo. Puoi aggiungere porzioni e vincoli ("senza
+            glutine", "al forno").
+          </p>
+        </div>
       )}
 
       {mode === 'photo' && (
@@ -132,7 +157,7 @@ export default function ImportPage() {
       {error && <p className="notice bg-danger-soft text-danger">{error}</p>}
 
       <button className="btn-primary w-full py-3 text-lg" onClick={run} disabled={!canRun || status !== null || configured === false}>
-        {status ?? 'Struttura la ricetta'}
+        {status ?? (mode === 'dish' ? 'Scrivi la ricetta' : 'Struttura la ricetta')}
       </button>
     </div>
   )

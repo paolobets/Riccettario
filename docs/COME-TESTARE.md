@@ -26,17 +26,23 @@ Le ricette vivono nel browser del dispositivo: telefono e computer hanno archivi
 - [ ] "Esci" chiede conferma; "Resta in cucina" non perde nulla.
 - [ ] Arriva in fondo, dai un voto e una nota, salva: compaiono nel "Diario di cottura" della ricetta. Una cottura abbandonata con "Esci" non compare.
 
-### 3. Wizard
+### 3. Cosa preparo? (nessuna chiave)
+- [ ] Dalla lista, "Cosa preparo oggi?". Scegli "45 minuti" e scrivi "uova, pecorino": la proposta è la carbonara con "Hai già pecorino". "Un'altra" scorre le alternative.
+- [ ] Scegli "20 minuti": nessuna ricetta sta nel tempo; "Togli il limite di tempo" e "Fatti scrivere una ricetta" (porta a Importa → Piatto).
+
+### 4. Wizard
 - [ ] "+ Nuova": inserisci titolo e porzioni, due ingredienti (uno "a pezzi interi"), un passaggio inserendo gli ingredienti con i bottoni sotto al testo.
 - [ ] Nel riepilogo controlla la "Prova di scalatura ×2", poi salva.
 
-### 4. Assistente AI (serve la chiave)
+### 5. Assistente AI (serve la chiave)
 - [ ] *Impostazioni → Assistente AI*: incolla la chiave Anthropic, scegli il modello, salva.
-- [ ] *✨ Importa → Testo*: incolla una ricetta qualsiasi (anche presa da un sito). Controlla nel riepilogo ingredienti, regole di scalatura e passaggi, poi salva. Sotto il banner c'è il costo della richiesta.
-- [ ] *✨ Importa → Foto*: fotografa una pagina di un libro di ricette.
-- [ ] *✨ Importa → Indirizzo web*: incolla l'URL di una ricetta. Questo è il percorso meno collaudato: se fallisce, segnalalo con l'URL usato.
+- [ ] *Importa → Testo*: incolla una ricetta qualsiasi (anche presa da un sito). Controlla nel riepilogo ingredienti, regole di scalatura e passaggi, poi salva. Sotto il banner c'è il costo della richiesta.
+- [ ] *Importa → Foto*: fotografa una pagina di un libro di ricette.
+- [ ] *Importa → Sito*: incolla l'URL di una ricetta. Questo è il percorso meno collaudato: se fallisce, segnalalo con l'URL usato.
+- [ ] *Importa → Piatto*: scrivi "vitello tonnato per 6" e "Scrivi la ricetta": nel riepilogo controlla dosi, regole e passaggi; la fonte dice che l'ha scritta l'assistente.
+- [ ] *Cosa preparo?* → "Chiedi all'AI": propone una tua ricetta con il perché, oppure un piatto nuovo con "Scrivi la ricetta" che apre Importa già compilato.
 - [ ] In una ricetta apri l'assistente e fai una domanda rapida. Ricarica la pagina: la conversazione è ancora lì.
-- [ ] In modalità cucina, "✨ Chiedi" su un passaggio.
+- [ ] In modalità cucina, "Chiedi" su un passaggio.
 - [ ] Scheda "Variante": scrivi un'istruzione, crea la variante, controlla che si apra come nuova ricetta.
 - [ ] *Impostazioni*: la "Spesa stimata finora" riporta le richieste fatte.
 

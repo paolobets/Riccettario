@@ -6,7 +6,9 @@ App ricettario personale, installabile come PWA e funzionante offline, con tre i
 2. **Configuratore di quantità**: si cambiano le porzioni, la resa totale, oppure *un singolo ingrediente* ("ho solo 300 g di farina") e tutta la ricetta si adatta. La scalatura non è ingenuamente lineare: sale e lievito crescono meno, le uova restano intere, le percentuali del panettiere seguono la farina.
 3. **Modalità cucina**: un passaggio per schermata, caratteri grandi, timer multipli sempre visibili e persistenti, passaggi paralleli ("nel frattempo puoi"), schermo sempre acceso, checklist di mise en place e diario di fine cottura.
 
-4. **Assistente AI** (Claude): importa una ricetta da testo incollato, foto o indirizzo web e la trasforma nella struttura con le regole di scalatura già proposte; risponde a domande sulla ricetta tenendo conto del fattore di scalatura e del diario di cottura; crea varianti complete da un'istruzione ("senza lattosio", "applica le note dell'ultima volta").
+4. **Assistente AI** (Claude): importa una ricetta da testo incollato, foto o indirizzo web e la trasforma nella struttura con le regole di scalatura già proposte; scrive la ricetta di un piatto chiesto per nome; risponde a domande sulla ricetta tenendo conto del fattore di scalatura e del diario di cottura; crea varianti complete da un'istruzione ("senza lattosio", "applica le note dell'ultima volta").
+
+5. **Cosa preparo?**: scegli il pasto, il tempo che hai ai fornelli e cosa c'è in casa; l'app pesca tra le tue ricette (preferendo quelle che usano quello che hai e che non cucini da un po') e, se vuoi, chiede all'AI una seconda opinione o un piatto nuovo.
 
 ## Come provarla
 
@@ -43,11 +45,11 @@ src/
     __tests__/ test vitest del motore
   data/        Dexie (IndexedDB): schema, ricette di esempio, funzioni CRUD, export/import
   app/         interfaccia React
-    pages/     RecipeList, RecipeView (lettura + configuratore), CookMode, RecipeWizard, Settings
+    pages/     RecipeList, RecipeView (lettura + configuratore), CookMode, RecipeWizard, SuggestPage, ImportPage, Settings
     components/ScalerPanel, IngredientList, StepText, TimerButton, Layout
     hooks/     useScaler (fattore nell'URL, `?f=1.5`)
     timers/    store dei timer attivi, persistito in localStorage
-  ai/          client Anthropic, schema di scambio (zod) e conversione in Recipe, import, domande, varianti
+  ai/          client Anthropic, schema di scambio (zod) e conversione in Recipe, import, domande, varianti, suggerimenti
 proxy/         worker Cloudflare opzionale che custodisce la chiave API
     branding.ts nome, descrizione e colori dell'app
 docs/

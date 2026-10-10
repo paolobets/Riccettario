@@ -2,13 +2,15 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { getClient } from './client'
 import { aiRecipeSchema, aiToRecipe, type ConversionResult } from './schema'
-import { SYSTEM_IMPORT } from './prompts'
+import { SYSTEM_DISH, SYSTEM_IMPORT } from './prompts'
 import { recordUsage } from './usage'
 
 export interface ImportInput {
   text?: string
   url?: string
   images?: File[]
+  /** Nome di un piatto: l'AI scrive la ricetta da zero invece di trascriverla. */
+  dish?: string
 }
 
 export type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
@@ -45,14 +47,15 @@ export async function importRecipe(input: ImportInput, onStatus?: (s: string) =>
   if (input.url?.trim()) parts.push(`Ricetta da questa pagina: ${input.url.trim()}\nLeggi la pagina e trascrivi la ricetta.`)
   if (input.text?.trim()) parts.push(`Testo della ricetta:\n\n${input.text.trim()}`)
   if (input.images?.length) parts.push('Trascrivi la ricetta fotografata nelle immagini.')
-  if (parts.length === 0) throw new Error('Inserisci un testo, una foto o un indirizzo.')
+  if (input.dish?.trim()) parts.push(`Scrivi la ricetta di: ${input.dish.trim()}`)
+  if (parts.length === 0) throw new Error('Inserisci un testo, una foto, un indirizzo o il nome di un piatto.')
   content.push({ type: 'text', text: parts.join('\n\n') })
 
-  onStatus?.('Chiedo all\'AI di strutturare la ricetta…')
+  onStatus?.(input.dish ? 'Chiedo all\'AI di scrivere la ricetta…' : 'Chiedo all\'AI di strutturare la ricetta…')
   const response = await client.messages.parse({
     model: settings.model,
     max_tokens: 16000,
-    system: SYSTEM_IMPORT,
+    system: input.dish?.trim() ? SYSTEM_DISH : SYSTEM_IMPORT,
     messages: [{ role: 'user', content }],
     output_config: { format: zodOutputFormat(aiRecipeSchema) },
     ...(input.url?.trim() ? { tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 3 }] } : {}),

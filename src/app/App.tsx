@@ -9,6 +9,7 @@ import RecipeWizard from './pages/RecipeWizard'
 import Settings from './pages/Settings'
 import ImportPage from './pages/ImportPage'
 import NotFound from './pages/NotFound'
+import SuggestPage from './pages/SuggestPage'
 
 export default function App() {
   const [ready, setReady] = useState(false)
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="ricetta/:id/modifica" element={<RecipeWizard />} />
         <Route path="impostazioni" element={<Settings />} />
         <Route path="importa" element={<ImportPage />} />
+        <Route path="cosa-preparo" element={<SuggestPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
       <Route path="ricetta/:id/cucina" element={<CookMode />} />
