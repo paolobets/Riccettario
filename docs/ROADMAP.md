@@ -19,17 +19,46 @@
 
 ## Prossimi passi
 
-### Uso quotidiano
-- Comandi vocali in modalità cucina (push-to-talk: avanti, indietro, ripeti, timer).
-- Vista "percentuali del panettiere" per i lievitati.
+Funzionalità concordate il 10 ottobre 2026, in ordine di priorità. Ogni voce dice su cosa si appoggia, così lo sforzo resta stimabile.
+
+### 1. Lista della spesa
+Scegli più ricette con le loro porzioni; l'app somma gli ingredienti già riscalati (stessa unità base, stesso nome), li raggruppa per sezione o reparto, permette di spuntarli e di copiarli come testo. Si appoggia a `scaleRecipe` e `toBase`; nuova tabella `lists` in Dexie con le spunte. Sforzo medio.
+
+### 2. Cosa preparo stasera, o a pranzo
+Dalla lista, un bottone "Cosa preparo?" apre tre domande: pasto (pranzo, cena), tempo a disposizione (20 min, 45 min, senza fretta), cosa ho in casa (testo libero, facoltativo). Senza AI l'app pesca tra le proprie ricette: tempo ai fornelli entro il limite, tag coerenti col pasto, esclude quelle cucinate negli ultimi giorni (dal diario), propone una ricetta alla volta con "un'altra". Con l'AI configurata e gli ingredienti indicati, chiede a Claude di scegliere tra le ricette del ricettario e, se nessuna va bene, di proporne una nuova che passa da "Trovami la ricetta". Sforzo medio; la parte senza AI è piccola e va fatta per prima.
+
+### 3. Trovami la ricetta per un piatto
+In Importa, quarta sorgente "Piatto": si scrive il nome ("vitello tonnato", "ramen di pollo per 2") e l'AI scrive la ricetta completa nella struttura dell'app, con regole di scalatura già proposte, da rivedere nel wizard come per le altre sorgenti. Stesso schema e stessa validazione dell'import da testo, cambia solo il prompt. Quando il proxy avrà `web_fetch`, la ricerca sul web potrà dare una fonte reale. Sforzo piccolo.
+
+### 4. Pronto per le 20:00
+Dato l'orario del pasto, la modalità cucina calcola a ritroso quando iniziare ogni passaggio usando durate, timer e passaggi paralleli, mostra la timeline e manda una notifica a ogni orario di avvio. Si appoggia a `totalDuration`, `parallelWith` e allo store dei timer. Sforzo medio.
+
+### 5. Import da sito senza AI
+Lettura dei dati JSON-LD (schema.org/Recipe) che quasi tutti i siti espongono: ingredienti e passaggi arrivano gratis e in modo deterministico; l'AI resta solo per proporre le regole di scalatura e collegare gli ingredienti ai passaggi. Richiede il passaggio dal proxy per aggirare CORS. Sforzo medio.
+
+### 6. Scalatura per teglia o stampo
+La resa può essere un diametro o una misura di teglia: cambiando la teglia il fattore è il rapporto tra le aree. Si innesta sul pivot della resa totale. Sforzo piccolo.
+
+### 7. Riprendi la cottura
+Se una cottura è rimasta aperta (passo in sessionStorage), il bottone della ricetta diventa "Riprendi dal passo 4". Sforzo piccolo.
+
+### 8. Diario più ricco
+"Cucinata 5 volte, ultima il 3 ottobre" in lista, ordinamento per frequenza, foto del risultato a fine cottura. Sforzo piccolo per i contatori, medio per le foto.
+
+### 9. Controllo della ricetta
+Avvisi nel riepilogo del wizard: passaggi lunghi senza timer, riposi senza passaggi paralleli, uova senza regola a pezzi interi, ingredienti mai citati (già c'è). Sforzo piccolo.
+
+### 10. Preferiti, ordinamento, raccolte
+Stella sulle ricette, ordine alfabetico o per frequenza, raccolte ("Natale", "Settimana"). Sforzo piccolo.
+
+### 11. Stampa e condivisione
+Vista di stampa pulita; condivisione come testo o come link che contiene la ricetta. Sforzo piccolo.
+
+### Già in programma
 - Conversione unità (tazze ↔ grammi per ingredienti noti).
-- Foto per ricetta e per passaggio.
-
-### AI
-- Verifica dal vivo dell'import da URL (usa il tool `web_fetch` lato server): finora provato solo con risposte simulate.
-- Comandi vocali per le domande in cucina.
-
-### Infrastruttura
-- Sincronizzazione tra dispositivi (opzionale, es. PocketBase o file su cloud).
-- Test end-to-end con Playwright.
+- Vista "percentuali del panettiere" per i lievitati.
+- Comandi vocali in modalità cucina e per le domande.
+- Verifica dal vivo dell'import da URL con `web_fetch` lato server.
+- Sincronizzazione tra dispositivi (file su cloud o PocketBase): da decidere dopo aver capito se basta un file.
+- Test end-to-end con Playwright (gli script usati per la revisione UI sono una base).
 - Icone PWA raster per iOS.
