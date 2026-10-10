@@ -9,6 +9,7 @@ import IngredientList from '../components/IngredientList'
 import StepText from '../components/StepText'
 import TimerButton from '../components/TimerButton'
 import TimerBar from '../components/TimerBar'
+import CookAssistant from '../components/CookAssistant'
 
 /** Tiene lo schermo acceso finché la pagina è aperta (dove il browser lo permette). */
 function useWakeLock() {
@@ -147,11 +148,10 @@ export default function CookMode() {
             {step.equipment && step.equipment.length > 0 && (
               <p className="text-stone-600">🍳 {step.equipment.join(', ')}</p>
             )}
-            {step.timer && (
-              <div>
-                <TimerButton recipeId={recipe.id} stepId={step.id} timer={step.timer} size="lg" />
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              {step.timer && <TimerButton recipeId={recipe.id} stepId={step.id} timer={step.timer} size="lg" />}
+              <CookAssistant recipe={recipe} factor={scaled.factor} stepContext={`passo ${index + 1} di ${total}: ${renderStepPlain(step, scaled)}`} />
+            </div>
             {parallelParentIndex >= 0 && (
               <button className="w-fit rounded-lg bg-sky-50 px-3 py-2 text-left text-sm text-sky-900" onClick={() => setIndex(parallelParentIndex)}>
                 ↔ Da fare durante il passo {parallelParentIndex + 1}. Tocca per tornarci.

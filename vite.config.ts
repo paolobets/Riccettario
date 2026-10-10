@@ -5,13 +5,28 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 import { APP_DESCRIPTION, APP_NAME, BACKGROUND_COLOR, THEME_COLOR } from './src/app/branding'
 
+/** GitHub Pages risponde 404 ai percorsi profondi: con 404.html uguale a index.html l'app parte comunque. */
+function spaFallback() {
+  return {
+    name: 'spa-fallback-404',
+    async writeBundle(options: { dir?: string }) {
+      const { copyFile } = await import('node:fs/promises')
+      const dir = options.dir ?? 'dist'
+      await copyFile(`${dir}/index.html`, `${dir}/404.html`).catch(() => undefined)
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
+    spaFallback(),
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
+      // in dev non serve e confonde le prove in locale
+      devOptions: { enabled: false },
       manifest: {
         name: APP_NAME,
         short_name: APP_NAME,
@@ -20,6 +35,8 @@ export default defineConfig({
         background_color: BACKGROUND_COLOR,
         display: 'standalone',
         lang: 'it',
+        start_url: './',
+        scope: './',
         icons: [
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
         ],

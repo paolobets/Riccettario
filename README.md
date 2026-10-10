@@ -8,7 +8,22 @@ App ricettario personale, installabile come PWA e funzionante offline, con tre i
 
 4. **Assistente AI** (Claude): importa una ricetta da testo incollato, foto o indirizzo web e la trasforma nella struttura con le regole di scalatura già proposte; risponde a domande sulla ricetta tenendo conto del fattore di scalatura e del diario di cottura; crea varianti complete da un'istruzione ("senza lattosio", "applica le note dell'ultima volta").
 
-## Avvio
+## Come provarla
+
+**Dal telefono o dal browser, senza installare nulla.** Ogni push su `main` pubblica l'app su GitHub Pages tramite `.github/workflows/deploy.yml`: l'indirizzo è `https://<utente>.github.io/<nome-repo>/` (per questo repository: https://paolobets.github.io/Riccettario/). Aprila, poi "Aggiungi alla schermata Home" per averla come app: funziona anche offline. Le ricette restano nel browser del dispositivo; usa *Impostazioni → Esporta* per il backup.
+
+Se la pubblicazione non parte al primo push, in *Settings → Pages* del repository imposta la sorgente su "GitHub Actions" e rilancia il workflow.
+
+**In locale:**
+
+```bash
+pnpm install
+pnpm dev        # sviluppo su http://localhost:5173
+```
+
+Per l'assistente AI serve una chiave API Anthropic (da https://console.anthropic.com), da inserire in *Impostazioni → Assistente AI*.
+
+## Comandi
 
 ```bash
 pnpm install
@@ -18,7 +33,7 @@ pnpm build      # build di produzione in dist/
 pnpm preview    # anteprima del build
 ```
 
-Richiede Node 22+. Il progetto usa `pnpm`.
+Richiede Node 22+. Il progetto usa `pnpm`. In CI girano test e typecheck prima della pubblicazione.
 
 ## Struttura
 
@@ -48,7 +63,7 @@ Serve una chiave API Anthropic, da inserire in *Impostazioni → Assistente AI*.
 
 Chi preferisce non tenere la chiave nel browser può pubblicare `proxy/cloudflare-worker.js` su Cloudflare Workers (istruzioni nel file): l'app parla col proxy usando una password e il proxy aggiunge la vera chiave.
 
-Il codice dell'AI è in `src/ai/` e viene caricato solo quando serve, così il resto dell'app resta leggero e offline.
+Il codice dell'AI è in `src/ai/` e viene caricato solo quando serve, così il resto dell'app resta leggero e offline. Ogni risposta mostra il costo reale della richiesta (dai token riportati dall'API) e in *Impostazioni* c'è il totale speso. Le conversazioni restano salvate per ricetta e sono disponibili anche in modalità cucina, dove il bottone "Chiedi" passa all'AI il passaggio corrente.
 
 ## Dati
 

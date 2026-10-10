@@ -163,7 +163,7 @@ export default function RecipeWizard() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const prefill = (location.state ?? {}) as { recipe?: Recipe; warnings?: string[]; fromAi?: boolean }
+  const prefill = (location.state ?? {}) as { recipe?: Recipe; warnings?: string[]; fromAi?: boolean; costUsd?: number }
   const [phase, setPhase] = useState<Phase>(prefill.recipe ? 3 : 0)
   const [draft, setDraft] = useState<Draft | null>(id ? null : fromRecipe(prefill.recipe ?? { ...emptyRecipe(), ingredients: [], steps: [] }))
   const [base, setBase] = useState<Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>>(() => (prefill.recipe ? { id: prefill.recipe.id, createdAt: prefill.recipe.createdAt, updatedAt: prefill.recipe.updatedAt } : emptyRecipe()))
@@ -201,7 +201,10 @@ export default function RecipeWizard() {
       </div>
       {prefill.fromAi && (
         <div className="rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
-          <p>L'AI ha strutturato la ricetta. Controlla ingredienti, regole di scalatura e passaggi, poi salva.</p>
+          <p>
+            L'AI ha strutturato la ricetta. Controlla ingredienti, regole di scalatura e passaggi, poi salva.
+            {prefill.costUsd !== undefined && <span className="text-sky-700"> Costo della richiesta: {prefill.costUsd < 0.01 ? '< $0,01' : `$${prefill.costUsd.toFixed(2)}`}.</span>}
+          </p>
           {prefill.warnings?.map((w) => (
             <p key={w} className="mt-1 text-amber-800">⚠︎ {w}</p>
           ))}

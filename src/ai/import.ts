@@ -3,6 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { getClient } from './client'
 import { aiRecipeSchema, aiToRecipe, type ConversionResult } from './schema'
 import { SYSTEM_IMPORT } from './prompts'
+import { recordUsage } from './usage'
 
 export interface ImportInput {
   text?: string
@@ -33,7 +34,7 @@ export async function fileToImageBlock(file: File): Promise<Anthropic.ImageBlock
  * L'URL viene letto dal servizio AI tramite il tool web_fetch (il browser non
  * potrebbe scaricarlo per via del CORS).
  */
-export async function importRecipe(input: ImportInput, onStatus?: (s: string) => void): Promise<ConversionResult> {
+export async function importRecipe(input: ImportInput, onStatus?: (s: string) => void): Promise<ConversionResult & { costUsd: number }> {
   const { client, settings } = await getClient()
   const content: Anthropic.ContentBlockParam[] = []
   if (input.images?.length) {
@@ -59,5 +60,6 @@ export async function importRecipe(input: ImportInput, onStatus?: (s: string) =>
   if (response.stop_reason === 'refusal') throw new Error('Il servizio AI ha rifiutato la richiesta.')
   if (response.stop_reason === 'max_tokens') throw new Error('Risposta troppo lunga: prova con una ricetta più breve.')
   if (!response.parsed_output) throw new Error('Risposta dell\'AI non interpretabile. Riprova.')
-  return aiToRecipe(response.parsed_output)
+  const costUsd = await recordUsage(settings.model, response.usage)
+  return { ...aiToRecipe(response.parsed_output), costUsd }
 }

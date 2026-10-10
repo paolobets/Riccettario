@@ -5,10 +5,12 @@ import type { CookSession } from '@/data/db'
 import { getClient } from './client'
 import { aiRecipeSchema, aiToRecipe, recipeForPrompt, type ConversionResult } from './schema'
 import { SYSTEM_ASSIST, SYSTEM_VARIANT } from './prompts'
+import { recordUsage } from './usage'
 
 export interface ChatTurn {
   role: 'user' | 'assistant'
   text: string
+  costUsd?: number
 }
 
 function sessionsForPrompt(sessions: CookSession[]): string {
@@ -27,11 +29,11 @@ function sessionsForPrompt(sessions: CookSession[]): string {
  * precedenti della stessa conversazione; `factor` il fattore di scalatura attuale.
  */
 export async function askAboutRecipe(
-  params: { recipe: Recipe; factor: number; sessions: CookSession[]; history: ChatTurn[]; question: string },
+  params: { recipe: Recipe; factor: number; sessions: CookSession[]; history: ChatTurn[]; question: string; stepContext?: string },
   onDelta: (text: string) => void,
-): Promise<string> {
+): Promise<{ text: string; costUsd: number }> {
   const { client, settings } = await getClient()
-  const context = `Ricetta (JSON):\n${recipeForPrompt(params.recipe)}\n\nFattore di scalatura attuale: ×${params.factor}${sessionsForPrompt(params.sessions)}`
+  const context = `Ricetta (JSON):\n${recipeForPrompt(params.recipe)}\n\nFattore di scalatura attuale: ×${params.factor}${sessionsForPrompt(params.sessions)}${params.stepContext ? `\n\nL'utente sta cucinando adesso ed è a questo passaggio: ${params.stepContext}` : ''}`
   const messages: Anthropic.MessageParam[] = [
     ...params.history.map<Anthropic.MessageParam>((t) => ({ role: t.role, content: t.text })),
     { role: 'user', content: params.history.length === 0 ? `${context}\n\nDomanda: ${params.question}` : params.question },
@@ -45,14 +47,16 @@ export async function askAboutRecipe(
   stream.on('text', onDelta)
   const final = await stream.finalMessage()
   if (final.stop_reason === 'refusal') throw new Error('Il servizio AI ha rifiutato la richiesta.')
-  return final.content
+  const costUsd = await recordUsage(settings.model, final.usage)
+  const text = final.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
     .map((b) => b.text)
     .join('')
+  return { text, costUsd }
 }
 
 /** Produce una variante completa della ricetta seguendo un'istruzione. */
-export async function proposeVariant(params: { recipe: Recipe; sessions: CookSession[]; instruction: string }): Promise<ConversionResult> {
+export async function proposeVariant(params: { recipe: Recipe; sessions: CookSession[]; instruction: string }): Promise<ConversionResult & { costUsd: number }> {
   const { client, settings } = await getClient()
   const response = await client.messages.parse({
     model: settings.model,
@@ -68,5 +72,6 @@ export async function proposeVariant(params: { recipe: Recipe; sessions: CookSes
   })
   if (response.stop_reason === 'refusal') throw new Error('Il servizio AI ha rifiutato la richiesta.')
   if (!response.parsed_output) throw new Error('Risposta dell\'AI non interpretabile. Riprova.')
-  return aiToRecipe(response.parsed_output)
+  const costUsd = await recordUsage(settings.model, response.usage)
+  return { ...aiToRecipe(response.parsed_output), costUsd }
 }

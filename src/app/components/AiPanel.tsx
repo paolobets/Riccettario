@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import type { ChatTurn } from '@/ai/assist'
 import { isAiConfigured, loadAiSettings } from '@/ai/settings'
 import { db } from '@/data/db'
 import { saveRecipe } from '@/data/repo'
 import { newId, type Recipe } from '@/core'
+import { useRecipeChat } from '../hooks/useRecipeChat'
+import ChatThread from './ChatThread'
 
 interface Props {
   recipe: Recipe
@@ -22,71 +23,50 @@ const QUICK = [
 export default function AiPanel({ recipe, factor }: Props) {
   const navigate = useNavigate()
   const sessions = useLiveQuery(() => db.sessions.where('recipeId').equals(recipe.id).toArray(), [recipe.id]) ?? []
+  const chat = useRecipeChat(recipe, factor)
   const [open, setOpen] = useState(false)
   const [configured, setConfigured] = useState<boolean | null>(null)
-  const [history, setHistory] = useState<ChatTurn[]>([])
   const [question, setQuestion] = useState('')
-  const [partial, setPartial] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [variantMode, setVariantMode] = useState(false)
   const [instruction, setInstruction] = useState('')
-  const bottom = useRef<HTMLDivElement>(null)
+  const [variantBusy, setVariantBusy] = useState(false)
+  const [variantError, setVariantError] = useState<string | null>(null)
 
   useEffect(() => {
     if (open && configured === null) loadAiSettings().then((s) => setConfigured(isAiConfigured(s)))
   }, [open, configured])
-  useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [history, partial])
 
-  const ask = async (q: string) => {
-    if (!q.trim() || busy) return
-    setError(null)
-    setBusy(true)
+  const ask = (q: string) => {
     setQuestion('')
-    setPartial('')
-    try {
-      let acc = ''
-      const { askAboutRecipe } = await import('@/ai/assist')
-      const answer = await askAboutRecipe({ recipe, factor, sessions, history, question: q }, (d) => {
-        acc += d
-        setPartial(acc)
-      })
-      setHistory([...history, { role: 'user', text: q }, { role: 'assistant', text: answer }])
-    } catch (e) {
-      const { describeAiError } = await import('@/ai/client')
-      setError(describeAiError(e))
-    } finally {
-      setPartial(null)
-      setBusy(false)
-    }
+    chat.ask(q)
   }
 
   const makeVariant = async () => {
-    if (!instruction.trim() || busy) return
-    setError(null)
-    setBusy(true)
+    if (!instruction.trim() || variantBusy) return
+    setVariantError(null)
+    setVariantBusy(true)
     try {
       const { proposeVariant } = await import('@/ai/assist')
-      const { recipe: v, warnings } = await proposeVariant({ recipe, sessions, instruction })
+      const { recipe: v, warnings, costUsd } = await proposeVariant({ recipe, sessions, instruction })
       const saved = await saveRecipe({ ...v, id: newId('r'), title: v.title === recipe.title ? `${v.title} (variante)` : v.title })
-      navigate(`/ricetta/${saved.id}`, { state: { warnings } })
+      navigate(`/ricetta/${saved.id}`, { state: { warnings, costUsd } })
     } catch (e) {
       const { describeAiError } = await import('@/ai/client')
-      setError(describeAiError(e))
+      setVariantError(describeAiError(e))
     } finally {
-      setBusy(false)
+      setVariantBusy(false)
     }
   }
 
   if (!open) {
     return (
       <button className="btn-secondary w-full" onClick={() => setOpen(true)}>
-        ✨ Chiedi all'AI o crea una variante
+        ✨ {chat.turns.length > 0 ? `Assistente (${chat.turns.length / 2} scambi)` : "Chiedi all'AI o crea una variante"}
       </button>
     )
   }
+
+  const busy = chat.busy || variantBusy
 
   return (
     <section className="card space-y-3">
@@ -111,7 +91,7 @@ export default function AiPanel({ recipe, factor }: Props) {
 
       {!variantMode && (
         <>
-          {history.length === 0 && partial === null && (
+          {chat.turns.length === 0 && chat.partial === null && (
             <div className="flex flex-wrap gap-2">
               {QUICK.map((q) => (
                 <button key={q} className="chip hover:bg-brand-200" onClick={() => ask(q)} disabled={busy || configured === false}>
@@ -120,15 +100,7 @@ export default function AiPanel({ recipe, factor }: Props) {
               ))}
             </div>
           )}
-          <div className="max-h-96 space-y-2 overflow-y-auto">
-            {history.map((t, i) => (
-              <div key={i} className={`rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${t.role === 'user' ? 'ml-8 bg-brand-100' : 'mr-4 bg-stone-100'}`}>
-                {t.text}
-              </div>
-            ))}
-            {partial !== null && <div className="mr-4 rounded-xl bg-stone-100 px-3 py-2 text-sm whitespace-pre-wrap">{partial || '…'}</div>}
-            <div ref={bottom} />
-          </div>
+          <ChatThread turns={chat.turns} partial={chat.partial} />
           <form
             className="flex gap-2"
             onSubmit={(e) => {
@@ -138,9 +110,15 @@ export default function AiPanel({ recipe, factor }: Props) {
           >
             <input className="flex-1" placeholder="Fai una domanda sulla ricetta…" value={question} onChange={(e) => setQuestion(e.target.value)} disabled={busy} />
             <button className="btn-primary" type="submit" disabled={busy || !question.trim() || configured === false}>
-              {busy ? '…' : 'Invia'}
+              {chat.busy ? '…' : 'Invia'}
             </button>
           </form>
+          {chat.turns.length > 0 && (
+            <button className="btn-ghost px-2 py-1 text-xs" onClick={chat.reset} disabled={busy}>
+              Nuova conversazione
+            </button>
+          )}
+          {chat.error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{chat.error}</p>}
         </>
       )}
 
@@ -159,12 +137,11 @@ export default function AiPanel({ recipe, factor }: Props) {
             disabled={busy}
           />
           <button className="btn-primary w-full" onClick={makeVariant} disabled={busy || !instruction.trim() || configured === false}>
-            {busy ? 'Creo la variante…' : 'Crea variante'}
+            {variantBusy ? 'Creo la variante…' : 'Crea variante'}
           </button>
+          {variantError && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{variantError}</p>}
         </div>
       )}
-
-      {error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-800">{error}</p>}
     </section>
   )
 }

@@ -10,6 +10,8 @@
 - Timer multipli persistenti (barra sempre visibile, sopravvivono al ricaricamento, tocco per saltare al passaggio).
 - Passaggi paralleli (`parallelWith`): "nel frattempo puoi" in modalità cucina, selezione nel wizard.
 - Nome e colori dell'app in un unico file (`src/app/branding.ts`).
+- Assistente in modalità cucina (domande sul passaggio corrente), costo reale per risposta e totale in impostazioni, conversazioni salvate per ricetta.
+- Pubblicazione automatica su GitHub Pages a ogni push su main.
 - Assistente AI: import da testo, foto e URL con output strutturato validato (zod) e revisione nel wizard; domande in streaming con contesto (ricetta, fattore, diario); varianti complete salvate accanto all'originale. Chiave sul dispositivo o proxy Cloudflare opzionale.
 
 ## Prossimi passi
@@ -21,10 +23,8 @@
 - Foto per ricetta e per passaggio.
 
 ### AI
-- Assistente in cottura: domande al volo sul passaggio corrente dalla modalità cucina.
 - Verifica dal vivo dell'import da URL (usa il tool `web_fetch` lato server): finora provato solo con risposte simulate.
-- Stima del costo prima di ogni richiesta (conteggio token).
-- Storico delle conversazioni per ricetta.
+- Comandi vocali per le domande in cucina.
 
 ### Infrastruttura
 - Sincronizzazione tra dispositivi (opzionale, es. PocketBase o file su cloud).

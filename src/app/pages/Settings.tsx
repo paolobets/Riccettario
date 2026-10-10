@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { exportAll, importJson } from '@/data/repo'
 import { DEFAULT_MODEL, loadAiSettings, MODELS, saveAiSettings, type AiSettings } from '@/ai/settings'
+import { formatUsd, loadUsage, resetUsage, type UsageTotals } from '@/ai/usage'
 
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -8,8 +9,10 @@ export default function Settings() {
   const [ai, setAi] = useState<AiSettings>({ apiKey: '', proxyUrl: '', model: DEFAULT_MODEL })
   const [aiSaved, setAiSaved] = useState(false)
   const [showKey, setShowKey] = useState(false)
+  const [usage, setUsage] = useState<UsageTotals | null>(null)
   useEffect(() => {
     loadAiSettings().then(setAi)
+    loadUsage().then(setUsage)
   }, [])
 
   const download = async () => {
@@ -88,6 +91,22 @@ export default function Settings() {
           </button>
           {aiSaved && <span className="text-sm text-green-700">Salvato.</span>}
         </div>
+        {usage && usage.requests > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-stone-50 p-3 text-sm text-stone-700">
+            <span>
+              Spesa stimata finora: <b>{formatUsd(usage.costUsd)}</b> in {usage.requests} richieste ({usage.inputTokens.toLocaleString('it-IT')} token in ingresso, {usage.outputTokens.toLocaleString('it-IT')} in uscita).
+            </span>
+            <button
+              className="btn-ghost px-2 py-1 text-xs"
+              onClick={async () => {
+                await resetUsage()
+                setUsage(await loadUsage())
+              }}
+            >
+              Azzera
+            </button>
+          </div>
+        )}
       </section>
       <section className="card space-y-3">
         <h2 className="font-semibold">Backup</h2>

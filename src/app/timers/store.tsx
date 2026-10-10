@@ -55,7 +55,7 @@ export function timerId(recipeId: string, stepId: string): string {
 function notify(label: string) {
   try {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Timer finito', { body: label, icon: '/icon.svg' })
+      new Notification('Timer finito', { body: label, icon: `${import.meta.env.BASE_URL}icon.svg` })
     }
     if ('vibrate' in navigator) navigator.vibrate?.([300, 100, 300, 100, 600])
     const ctx = new AudioContext()

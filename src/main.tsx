@@ -12,7 +12,7 @@ document.title = APP_NAME
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <TimerProvider>
         <App />
       </TimerProvider>

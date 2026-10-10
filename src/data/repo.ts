@@ -21,9 +21,10 @@ export async function saveRecipe(recipe: Recipe): Promise<Recipe> {
 }
 
 export async function deleteRecipe(id: string): Promise<void> {
-  await db.transaction('rw', db.recipes, db.sessions, async () => {
+  await db.transaction('rw', db.recipes, db.sessions, db.chats, async () => {
     await db.recipes.delete(id)
     await db.sessions.where('recipeId').equals(id).delete()
+    await db.chats.where('recipeId').equals(id).delete()
   })
 }
 
