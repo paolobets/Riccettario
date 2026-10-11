@@ -1,9 +1,11 @@
 /**
- * Accesso a D1 (SQLite di Cloudflare): utenti, archivio sincronizzato, consumi.
+ * Accesso a D1 (SQLite di Cloudflare): utenti, sessioni, archivio sincronizzato, consumi.
  *
  * Lo schema si crea da solo alla prima richiesta (CREATE TABLE IF NOT EXISTS),
  * così su Pages non serve un passo di migrazione; `functions/schema.sql` è la
- * stessa cosa in forma leggibile, per chi vuole eseguirla a mano.
+ * stessa cosa in forma leggibile, per chi vuole eseguirla a mano. Le colonne
+ * aggiunte dopo la prima versione (email, password_hash, role…) si aggiungono
+ * con ALTER TABLE a un database già esistente.
  *
  * Il contenuto di ricette, cotture e conversazioni resta JSON dentro la riga:
  * il modello dati vive nell'app, il server lo sincronizza senza interpretarlo.
@@ -11,17 +13,58 @@
  * vince) e `synced_at` (ora del server, decide cosa è "nuovo" per gli altri
  * dispositivi).
  */
+import { hashPassword } from './auth.js'
 
 export const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    token_hash TEXT NOT NULL UNIQUE,
+    token_hash TEXT UNIQUE,
+    email TEXT,
+    password_hash TEXT,
+    role TEXT NOT NULL DEFAULT 'user',
+    email_verified_at TEXT,
     plan TEXT NOT NULL DEFAULT 'tester',
     budget_usd REAL,
     disabled INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     last_seen_at TEXT
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (email)`,
+  `CREATE TABLE IF NOT EXISTS auth_sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    device TEXT,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions (user_id)`,
+  `CREATE TABLE IF NOT EXISTS invites (
+    code TEXT PRIMARY KEY,
+    email TEXT,
+    plan TEXT NOT NULL DEFAULT 'tester',
+    budget_usd REAL,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    used_by TEXT
+  )`,
+  `CREATE TABLE IF NOT EXISTS throttle (
+    key TEXT PRIMARY KEY,
+    failures INTEGER NOT NULL DEFAULT 0,
+    locked_until TEXT,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS password_resets (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT
   )`,
   ...['recipes', 'sessions', 'chats'].map(
     (t) => `CREATE TABLE IF NOT EXISTS ${t} (
@@ -51,13 +94,31 @@ export const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS usage_at ON usage (at)`,
 ]
 
+/** Colonne di `users` nate dopo la prima versione: su un database vecchio si aggiungono una per una. */
+export const USERS_ADDED_COLUMNS = [
+  ['email', 'TEXT'],
+  ['password_hash', 'TEXT'],
+  ['role', "TEXT NOT NULL DEFAULT 'user'"],
+  ['email_verified_at', 'TEXT'],
+]
+
 const SYNC_TABLES = ['recipes', 'sessions', 'chats']
 const PULL_LIMIT = 2000
 
 const ready = new WeakSet()
 export async function ensureSchema(db) {
   if (ready.has(db)) return
-  await db.batch(SCHEMA.map((sql) => db.prepare(sql)))
+  // L'indice unico su email va dopo le ALTER: in un database vecchio la colonna ancora non c'è.
+  const [first, emailIndex, ...rest] = SCHEMA
+  await db.batch([first, ...rest].map((sql) => db.prepare(sql)))
+  for (const [col, type] of USERS_ADDED_COLUMNS) {
+    try {
+      await db.prepare(`ALTER TABLE users ADD COLUMN ${col} ${type}`).run()
+    } catch {
+      // la colonna esiste già
+    }
+  }
+  await db.prepare(emailIndex).run()
   ready.add(db)
 }
 
@@ -78,28 +139,84 @@ function newId(prefix) {
   return `${prefix}_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`
 }
 
+const USER_COLUMNS = 'id, name, email, role, plan, budget_usd, disabled, created_at, last_seen_at'
+
+/** Utente dalla password usata come chiave (modo "tester": x-api-key = password). */
 export async function findUserByToken(db, token) {
   const hash = await sha256(token)
-  const row = await db.prepare('SELECT id, name, plan, budget_usd, disabled FROM users WHERE token_hash = ?').bind(hash).first()
+  const row = await db.prepare(`SELECT ${USER_COLUMNS} FROM users WHERE token_hash = ?`).bind(hash).first()
   if (!row || row.disabled) return null
   return row
 }
 
 export async function findUserByName(db, name) {
-  return db.prepare('SELECT id, name, plan, budget_usd, disabled, created_at, last_seen_at FROM users WHERE name = ?').bind(name).first()
+  return db.prepare(`SELECT ${USER_COLUMNS}, password_hash, token_hash FROM users WHERE name = ?`).bind(name).first()
 }
 
-export async function createUser(db, { name, password = generatePassword(), plan = 'tester', budgetUsd = null }) {
+export async function findUserByEmail(db, email) {
+  return db.prepare(`SELECT ${USER_COLUMNS}, password_hash, token_hash FROM users WHERE email = ?`).bind(email).first()
+}
+
+export async function findUserById(db, id) {
+  return db.prepare(`SELECT ${USER_COLUMNS}, password_hash, token_hash FROM users WHERE id = ?`).bind(id).first()
+}
+
+export async function countUsers(db) {
+  return (await db.prepare('SELECT COUNT(*) AS n FROM users').first())?.n ?? 0
+}
+
+/** Nome libero a partire da una base (email o nome scelto): minuscolo, caratteri sicuri, suffisso numerico se preso. */
+export async function uniqueName(db, base) {
+  let slug = String(base ?? '')
+    .toLowerCase()
+    .replace(/@.*$/, '')
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[^a-z0-9]+|[^a-z0-9._-]+$/g, '')
+    .slice(0, 24)
+  if (slug.length < 2) slug = 'utente'
+  for (let i = 0; i < 100; i++) {
+    const candidate = i === 0 ? slug : `${slug}-${i + 1}`
+    if (!(await db.prepare('SELECT 1 FROM users WHERE name = ?').bind(candidate).first())) return candidate
+  }
+  return `${slug}-${crypto.randomUUID().slice(0, 6)}`
+}
+
+/**
+ * Utente creato dall'amministratore (o dal segreto USERS): la password vale
+ * sia come chiave diretta (x-api-key) sia per entrare dalla pagina di accesso con il nome.
+ */
+export async function createUser(db, { name, password = generatePassword(), plan = 'tester', budgetUsd = null, role = 'user' }) {
   const id = newId('u')
   await db
-    .prepare('INSERT INTO users (id, name, token_hash, plan, budget_usd, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(id, name, await sha256(password), plan, budgetUsd, new Date().toISOString())
+    .prepare('INSERT INTO users (id, name, token_hash, password_hash, role, plan, budget_usd, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, name, await sha256(password), await hashPassword(password), role, plan, budgetUsd, new Date().toISOString())
     .run()
-  return { id, name, plan, budgetUsd, password }
+  return { id, name, plan, budgetUsd, role, password }
 }
 
+/** Utente registrato con email: nessuna chiave diretta, solo sessioni. */
+export async function createEmailUser(db, { email, password, name, plan = 'tester', budgetUsd = null, role = 'user' }) {
+  const id = newId('u')
+  const now = new Date().toISOString()
+  // token_hash casuale e mai comunicato: tiene valida la colonna NOT NULL dei database nati prima delle email.
+  const unusedToken = await sha256(crypto.randomUUID() + id)
+  await db
+    .prepare('INSERT INTO users (id, name, token_hash, email, password_hash, role, plan, budget_usd, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, name, unusedToken, email, await hashPassword(password), role, plan, budgetUsd, now)
+    .run()
+  return { id, name, email, plan, budgetUsd, role, disabled: 0 }
+}
+
+/** Cambia la password: vale per l'accesso con email e, per gli utenti tester, anche come chiave diretta. */
+export async function setPassword(db, userId, password, { asToken = false } = {}) {
+  const hash = await hashPassword(password)
+  if (asToken) await db.prepare('UPDATE users SET password_hash = ?, token_hash = ? WHERE id = ?').bind(hash, await sha256(password), userId).run()
+  else await db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, userId).run()
+}
+
+/** Reset dell'amministratore per nome: nuova password, utente riattivato. */
 export async function resetPassword(db, name, password = generatePassword()) {
-  const r = await db.prepare('UPDATE users SET token_hash = ?, disabled = 0 WHERE name = ?').bind(await sha256(password), name).run()
+  const r = await db.prepare('UPDATE users SET token_hash = ?, password_hash = ?, disabled = 0 WHERE name = ?').bind(await sha256(password), await hashPassword(password), name).run()
   return r.meta?.changes ? password : null
 }
 
@@ -108,12 +225,17 @@ export async function setDisabled(db, name, disabled) {
   return Boolean(r.meta?.changes)
 }
 
+export async function setRole(db, name, role) {
+  const r = await db.prepare('UPDATE users SET role = ? WHERE name = ?').bind(role, name).run()
+  return Boolean(r.meta?.changes)
+}
+
 export async function touchUser(db, id) {
   await db.prepare('UPDATE users SET last_seen_at = ? WHERE id = ?').bind(new Date().toISOString(), id).run()
 }
 
 export async function listUsers(db) {
-  return (await db.prepare('SELECT id, name, plan, budget_usd, disabled, created_at, last_seen_at FROM users ORDER BY name').all()).results
+  return (await db.prepare(`SELECT ${USER_COLUMNS} FROM users ORDER BY name`).all()).results
 }
 
 const emptyUsage = () => ({ costUsd: 0, requests: 0, inputTokens: 0, outputTokens: 0 })
@@ -141,7 +263,7 @@ export async function dayUsage(db, day) {
 export async function monthUsageByUser(db, month) {
   const { results } = await db
     .prepare(
-      `SELECT u.name AS user, u.plan AS plan, u.budget_usd AS budgetUsd, u.disabled AS disabled, u.last_seen_at AS lastSeenAt,
+      `SELECT u.name AS user, u.email AS email, u.role AS role, u.plan AS plan, u.budget_usd AS budgetUsd, u.disabled AS disabled, u.last_seen_at AS lastSeenAt,
               COALESCE(SUM(x.cost_usd), 0) AS costUsd, COUNT(x.id) AS requests,
               COALESCE(SUM(x.input_tokens + x.cache_read_tokens + x.cache_write_tokens), 0) AS inputTokens, COALESCE(SUM(x.output_tokens), 0) AS outputTokens
        FROM users u LEFT JOIN usage x ON x.user_id = u.id AND x.at >= ?

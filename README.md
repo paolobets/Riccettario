@@ -12,11 +12,11 @@ App ricettario personale, installabile come PWA e funzionante offline, con tre i
 
 ## Come provarla
 
-**Su Cloudflare Pages, con backend e database (consigliato).** App e backend girano insieme: ogni persona riceve una password, le sue ricette si sincronizzano tra i dispositivi, la chiave Anthropic resta nei segreti del progetto, i consumi sono contati per persona con un budget mensile. La guida passo passo è in [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md); il messaggio da mandare a chi prova l'app in [docs/BENVENUTO-TESTER.md](docs/BENVENUTO-TESTER.md).
+**Su Cloudflare Pages, con backend e database (consigliato).** App e backend girano insieme: ogni persona entra con email e password (su invito, o con registrazione aperta), le sue ricette si sincronizzano tra i dispositivi, la chiave Anthropic resta nei segreti del progetto, i consumi sono contati per persona con un budget mensile. La guida passo passo è in [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md); il messaggio da mandare a chi prova l'app in [docs/BENVENUTO-TESTER.md](docs/BENVENUTO-TESTER.md).
 
 **Su GitHub Pages, ognuno con la propria chiave.** Ogni push su `main` pubblica l'app tramite `.github/workflows/deploy.yml` su `https://<utente>.github.io/<nome-repo>/` (per questo repository: https://paolobets.github.io/Riccettario/). Se la pubblicazione non parte al primo push, in *Settings → Pages* del repository imposta la sorgente su "GitHub Actions" e rilancia il workflow.
 
-In entrambi i casi: apri l'indirizzo sul telefono, poi "Aggiungi alla schermata Home" per averla come app, anche offline. Le ricette vivono nel browser del dispositivo; con il backend vengono anche sincronizzate sul server sotto la password, e su un dispositivo nuovo basta inserirla. Senza backend, per cambiare dispositivo si usa *Impostazioni → Esporta / Importa da file*.
+In entrambi i casi: apri l'indirizzo sul telefono, poi "Aggiungi alla schermata Home" per averla come app, anche offline. Le ricette vivono nel browser del dispositivo; con il backend vengono anche sincronizzate sul server sotto l'account, e su un dispositivo nuovo basta fare l'accesso. Senza backend, per cambiare dispositivo si usa *Impostazioni → Esporta / Importa da file*.
 
 **In locale:**
 
@@ -52,7 +52,7 @@ src/
     hooks/     useScaler (fattore nell'URL, `?f=1.5`)
     timers/    store dei timer attivi, persistito in localStorage
   ai/          client Anthropic, schema di scambio (zod) e conversione in Recipe, import, domande, varianti, suggerimenti
-functions/     backend su Cloudflare Pages (/api): proxy AI, utenti, budget, consumi, sincronizzazione; db.js parla con D1
+functions/     backend su Cloudflare Pages (/api): accessi (auth.js), proxy AI, budget, consumi, sincronizzazione; db.js parla con D1
 proxy/         lo stesso proxy come worker a sé, per chi tiene l'app su un altro host
     branding.ts nome, descrizione e colori dell'app
 docs/
@@ -66,7 +66,7 @@ Il motore di scalatura (`src/core/scaling.ts`) è deterministico e testato: l'in
 
 Serve una chiave API Anthropic, da inserire in *Impostazioni → Assistente AI*. La chiave resta in IndexedDB sul dispositivo e viene inviata solo ad Anthropic. Ogni richiesta ha un costo sul tuo account: il modello predefinito è Claude Opus 5.5, si può scegliere Sonnet o Haiku per spendere meno.
 
-Chi pubblica su Cloudflare Pages ha il backend incluso su `/api` (`functions/`) con database D1: utenti con password personale (creati dall'amministratore con `POST /admin/users`), budget mensile per persona e tetto giornaliero, una riga di consumo per ogni richiesta con la funzione che l'ha generata, sincronizzazione dell'archivio con `POST /sync` (ultima modifica vince, cancellazioni comprese), `/fetch` per leggere le pagine dei siti. Lo stesso codice si pubblica anche come worker a sé (`proxy/cloudflare-worker.js`). In Impostazioni l'app mostra "Il tuo mese" e lo stato della sincronizzazione; a budget esaurito l'assistente lo dice chiaramente e riparte il mese dopo.
+Chi pubblica su Cloudflare Pages ha il backend incluso su `/api` (`functions/`) con database D1: accesso con email e password (hash PBKDF2, sessioni per dispositivo revocabili, inviti, limite ai tentativi, reset via email con Resend o link dell'amministratore; rotte `/auth/*`), budget mensile per persona e tetto giornaliero, una riga di consumo per ogni richiesta con la funzione che l'ha generata, sincronizzazione dell'archivio con `POST /sync` (ultima modifica vince, cancellazioni comprese), `/fetch` per leggere le pagine dei siti. Lo stesso codice si pubblica anche come worker a sé (`proxy/cloudflare-worker.js`). In Impostazioni l'app mostra "Il tuo mese" e lo stato della sincronizzazione; a budget esaurito l'assistente lo dice chiaramente e riparte il mese dopo.
 
 Il codice dell'AI è in `src/ai/` e viene caricato solo quando serve, così il resto dell'app resta leggero e offline. Ogni risposta mostra il costo reale della richiesta (dai token riportati dall'API, cache compresa) e in *Impostazioni* c'è il totale speso. Le conversazioni restano salvate per ricetta e sono disponibili anche in modalità cucina, dove il bottone "Chiedi" passa all'AI il passaggio corrente.
 

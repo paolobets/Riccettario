@@ -14,7 +14,7 @@ export default function NotFound({ what = 'pagina' }: Props) {
       <h1 className="text-2xl font-medium text-fg">{what === 'ricetta' ? 'Ricetta non trovata' : 'Pagina non trovata'}</h1>
       <p className="mt-1 text-fg-2">
         {what === 'ricetta'
-          ? 'Forse è stata eliminata, oppure il link viene da un altro dispositivo: le ricette restano su quello in cui sono state create.'
+          ? 'Forse è stata eliminata, oppure non è ancora arrivata su questo dispositivo: controlla la sincronizzazione in Impostazioni.'
           : "L'indirizzo non corrisponde a nessuna schermata dell'app."}
       </p>
       <Link to="/" className="btn-primary mt-4">

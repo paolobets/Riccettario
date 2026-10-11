@@ -4,12 +4,58 @@
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
-  token_hash TEXT NOT NULL UNIQUE,
+  token_hash TEXT UNIQUE,
+  email TEXT,
+  password_hash TEXT,
+  role TEXT NOT NULL DEFAULT 'user',
+  email_verified_at TEXT,
   plan TEXT NOT NULL DEFAULT 'tester',
   budget_usd REAL,
   disabled INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   last_seen_at TEXT
+  );
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (email);
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  device TEXT,
+  created_at TEXT NOT NULL,
+  last_used_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  revoked_at TEXT
+  );
+
+CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions (user_id);
+
+CREATE TABLE IF NOT EXISTS invites (
+  code TEXT PRIMARY KEY,
+  email TEXT,
+  plan TEXT NOT NULL DEFAULT 'tester',
+  budget_usd REAL,
+  created_by TEXT,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  used_by TEXT
+  );
+
+CREATE TABLE IF NOT EXISTS throttle (
+  key TEXT PRIMARY KEY,
+  failures INTEGER NOT NULL DEFAULT 0,
+  locked_until TEXT,
+  updated_at TEXT NOT NULL
+  );
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT
   );
 
 CREATE TABLE IF NOT EXISTS recipes (

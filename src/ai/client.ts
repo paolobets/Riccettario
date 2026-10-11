@@ -37,7 +37,7 @@ function proxyMessage(e: unknown): string | null {
   const body = (e as { error?: { error?: { type?: string; message?: string } } }).error
   const inner = body?.error
   if (inner?.type === 'budget_exceeded' && inner.message) return inner.message
-  if (inner?.type === 'authentication_error' && inner.message?.includes('Password')) return inner.message
+  if (inner?.type === 'authentication_error' && inner.message && /Password|Sessione/.test(inner.message)) return inner.message
   return null
 }
 
@@ -45,7 +45,7 @@ export function describeAiError(e: unknown): string {
   if (e instanceof AiNotConfiguredError) return e.message
   const fromProxy = e instanceof Anthropic.APIError ? proxyMessage(e) : null
   if (fromProxy) return fromProxy
-  if (e instanceof Anthropic.AuthenticationError) return HOSTED ? 'Password non valida: controlla quella inserita in Impostazioni.' : 'Chiave API non valida.'
+  if (e instanceof Anthropic.AuthenticationError) return HOSTED ? 'Sessione scaduta o password non valida: accedi di nuovo dalle Impostazioni.' : 'Chiave API non valida.'
   if (e instanceof Anthropic.PermissionDeniedError) return 'Accesso negato: controlla chiave e proxy.'
   if (e instanceof Anthropic.RateLimitError) return 'Troppe richieste: riprova tra qualche secondo.'
   if (e instanceof Anthropic.BadRequestError) return `Richiesta non valida: ${e.message}`

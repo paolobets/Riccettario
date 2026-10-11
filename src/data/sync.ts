@@ -9,7 +9,7 @@
  */
 import { useSyncExternalStore } from 'react'
 import { applyIncoming, outgoingRows, staleTombstones, type Recipe, type SyncRow, type Tombstone } from '@/core'
-import { loadAiSettings } from '@/ai/settings'
+import { loadAiSettings, saveAiSettings } from '@/ai/settings'
 import { db, type Chat, type CookSession } from './db'
 
 export interface SyncStatus {
@@ -88,7 +88,7 @@ async function describeFailure(res: Response): Promise<string> {
   } catch {
     // corpo non JSON
   }
-  return res.status === 401 ? 'Password non valida.' : `Il server ha risposto ${res.status}.`
+  return res.status === 401 ? 'Accesso non valido.' : `Il server ha risposto ${res.status}.`
 }
 
 let inFlight: Promise<void> | null = null
@@ -139,6 +139,11 @@ async function run(): Promise<void> {
         headers: { 'content-type': 'application/json', 'x-api-key': key },
         body: JSON.stringify(body),
       })
+      if (res.status === 401 && key.startsWith('sess_')) {
+        // Sessione revocata o scaduta: dimentica il token, l'app propone di rientrare.
+        await saveAiSettings({ ...settings, apiKey: '' })
+        throw new Error('Sessione scaduta: accedi di nuovo.')
+      }
       if (!res.ok) throw new Error(await describeFailure(res))
       const result = (await res.json()) as SyncResponse
       pushed += body.recipes.length + body.sessions.length + body.chats.length

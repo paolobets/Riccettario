@@ -11,6 +11,10 @@ import Settings from './pages/Settings'
 import ImportPage from './pages/ImportPage'
 import NotFound from './pages/NotFound'
 import SuggestPage from './pages/SuggestPage'
+import LoginPage from './pages/auth/LoginPage'
+import RegisterPage from './pages/auth/RegisterPage'
+import ForgotPage from './pages/auth/ForgotPage'
+import ResetPage from './pages/auth/ResetPage'
 
 export default function App() {
   const [ready, setReady] = useState(false)
@@ -33,6 +37,10 @@ export default function App() {
         <Route path="impostazioni" element={<Settings />} />
         <Route path="importa" element={<ImportPage />} />
         <Route path="cosa-preparo" element={<SuggestPage />} />
+        <Route path="accedi" element={<LoginPage />} />
+        <Route path="registrati" element={<RegisterPage />} />
+        <Route path="password-dimenticata" element={<ForgotPage />} />
+        <Route path="reimposta" element={<ResetPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
       <Route path="ricetta/:id/cucina" element={<CookMode />} />

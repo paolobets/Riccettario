@@ -2,11 +2,11 @@
 
 ## Dove
 
-- **Online**: https://ricettario.pages.dev (Cloudflare Pages, con l'assistente già collegato: serve solo la password personale in *Impostazioni*). Lo specchio su GitHub Pages, https://paolobets.github.io/Riccettario/, richiede invece una chiave Anthropic propria. Entrambi si aggiornano a ogni push su `main`.
+- **Online**: https://ricettario.pages.dev (Cloudflare Pages, con l'assistente già collegato: si entra con il link d'invito ricevuto, poi con email e password). Lo specchio su GitHub Pages, https://paolobets.github.io/Riccettario/, richiede invece una chiave Anthropic propria. Entrambi si aggiornano a ogni push su `main`.
 - **Sul telefono come app**: apri l'indirizzo in Safari (iPhone) o Chrome (Android), poi *Condividi → Aggiungi alla schermata Home*. Da lì parte a schermo intero e funziona anche offline.
 - **In locale**: `pnpm install && pnpm dev`, poi http://localhost:5173.
 
-Le ricette vivono nel browser del dispositivo: telefono e computer hanno archivi separati. Per passarle da uno all'altro usa *Impostazioni → Esporta / Importa da file*.
+Su pages.dev le ricette si sincronizzano tra i dispositivi in cui fai l'accesso. Sullo specchio GitHub Pages vivono solo nel browser: per passarle usa *Impostazioni → Esporta / Importa da file*.
 
 ## Checklist, in ordine
 
@@ -26,9 +26,17 @@ Le ricette vivono nel browser del dispositivo: telefono e computer hanno archivi
 - [ ] "Esci" chiede conferma; "Resta in cucina" non perde nulla.
 - [ ] Arriva in fondo, dai un voto e una nota, salva: compaiono nel "Diario di cottura" della ricetta. Una cottura abbandonata con "Esci" non compare.
 
-### 2b. Sincronizzazione (su pages.dev, con la password)
-- [ ] Inserisci la password in *Impostazioni*: compare la sezione "Sincronizzazione" con l'ultima ora e il numero di ricette sul server.
-- [ ] Scrivi una nota su una ricetta; dopo qualche secondo "Sincronizza ora" riporta "1 inviata". Da un secondo dispositivo o da un altro browser, inserisci la stessa password: le ricette e la nota compaiono.
+### 2a. Accesso (su pages.dev)
+- [ ] Apri il link d'invito: la pagina dice "Invito valido per la tua email". Prova una password di 5 caratteri: viene rifiutata con la spiegazione. Scegline una lunga e crea l'account: la lista non mostra più l'avviso "Accedi per usare l'assistente".
+- [ ] *Impostazioni → Account*: c'è la tua email, "Il tuo mese", e in "Dispositivi collegati" questo dispositivo.
+- [ ] Da un altro browser o dal computer, *Accedi* con email e password sbagliata: "Email o password non corretti". Con quella giusta entri; in "Dispositivi collegati" ora sono due. Scollega il primo: su quello, alla prossima apertura, torna l'avviso di accesso.
+- [ ] "Cambia password" con la vecchia sbagliata viene rifiutato; con quella giusta va a buon fine e gli altri dispositivi vengono scollegati.
+- [ ] "Password dimenticata" dalla pagina di accesso: se le email non sono configurate lo dice; chiedi il link di reset a chi gestisce, aprilo, scegli la nuova password: sei dentro.
+- [ ] "Esci": le ricette restano sul telefono, l'assistente chiede di accedere.
+
+### 2b. Sincronizzazione (su pages.dev, dopo l'accesso)
+- [ ] In *Impostazioni* la sezione "Sincronizzazione" mostra l'ultima ora e il numero di ricette sul server.
+- [ ] Scrivi una nota su una ricetta; dopo qualche secondo "Sincronizza ora" riporta "1 inviata". Da un secondo dispositivo o da un altro browser, accedi con lo stesso account: le ricette e la nota compaiono.
 - [ ] Cancella una ricetta su un dispositivo: sull'altro sparisce alla prossima apertura.
 
 ### 3. Cosa preparo? (nessuna chiave)
@@ -40,7 +48,7 @@ Le ricette vivono nel browser del dispositivo: telefono e computer hanno archivi
 - [ ] Nel riepilogo controlla la "Prova di scalatura ×2", poi salva.
 
 ### 5. Assistente AI (serve la chiave)
-- [ ] *Impostazioni → Assistente AI*: incolla la tua password (su pages.dev) o la chiave Anthropic (su GitHub Pages), scegli il modello, salva. Su pages.dev compare "Il tuo mese: … su 3,00 $".
+- [ ] Su pages.dev basta aver fatto l'accesso: in *Impostazioni → Account* c'è "Il tuo mese: … su 3,00 $". Su GitHub Pages incolla la chiave Anthropic in *Impostazioni → Assistente AI*, scegli il modello, salva.
 - [ ] *Importa → Testo*: incolla una ricetta qualsiasi (anche presa da un sito). Controlla nel riepilogo ingredienti, regole di scalatura e passaggi, poi salva. Sotto il banner c'è il costo della richiesta.
 - [ ] *Importa → Foto*: fotografa una pagina di un libro di ricette.
 - [ ] *Importa → Sito*: incolla l'URL di una ricetta (Giallozafferano, Cucchiaio d'argento, un blog). Con il proxy configurato lo stato dice «Trovata "…", la strutturo»: la pagina è stata letta dai dati strutturati, costo di pochi centesimi. Senza proxy, o se la pagina non li espone, lo stato dice che la fa leggere all'AI. Se fallisce, segnalalo con l'URL usato.

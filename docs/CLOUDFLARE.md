@@ -1,6 +1,6 @@
 # Pubblicare su Cloudflare Pages
 
-L'app e il suo backend girano insieme su Cloudflare Pages, nel piano gratuito: l'app come sito statico, il backend come funzione su `/api` (`functions/api/[[path]].js`) con un database D1. Ogni persona ha una password personale, un budget mensile e il proprio archivio sincronizzato tra i dispositivi; la chiave Anthropic sta solo nei segreti del progetto.
+L'app e il suo backend girano insieme su Cloudflare Pages, nel piano gratuito: l'app come sito statico, il backend come funzione su `/api` (`functions/api/[[path]].js`) con un database D1. Ogni persona entra con email e password (su invito, finché l'app non è aperta a tutti), ha un budget mensile e il proprio archivio sincronizzato tra i dispositivi; la chiave Anthropic sta solo nei segreti del progetto.
 
 Tempo richiesto: venti minuti la prima volta. Serve un account Cloudflare (gratuito) e l'accesso al repository GitHub.
 
@@ -28,7 +28,7 @@ Tempo richiesto: venti minuti la prima volta. Serve un account Cloudflare (gratu
    - **D1 database**: `ricettario`
 3. Salva. Ripeti il binding anche per l'ambiente *Preview* se viene chiesto separatamente.
 
-Il database tiene utenti e password (con hash), l'archivio sincronizzato di ogni persona (ricette, diario, conversazioni) e una riga per ogni richiesta all'AI con il suo costo. Senza questo passo l'app funziona ma senza sincronizzazione, budget e conteggio.
+Il database tiene account e password (con hash lento), sessioni per dispositivo, inviti, l'archivio sincronizzato di ogni persona (ricette, diario, conversazioni) e una riga per ogni richiesta all'AI con il suo costo. Senza questo passo l'app funziona ma senza accessi, sincronizzazione, budget e conteggio.
 
 ## 3. Inserisci i segreti
 
@@ -37,7 +37,7 @@ Sempre in **Settings** del progetto → **Variables and Secrets** → **Add**, t
 | Nome | Valore |
 |---|---|
 | `ANTHROPIC_API_KEY` | la chiave da https://console.anthropic.com, `sk-ant-…` |
-| `ADMIN_TOKEN` | una password lunga solo tua, per creare utenti e leggere i consumi |
+| `ADMIN_TOKEN` | una password lunga solo tua, per i comandi da terminale (inviti, consumi, utenti) |
 
 Facoltativi, come variabili normali (non segreti):
 
@@ -45,14 +45,18 @@ Facoltativi, come variabili normali (non segreti):
 |---|---|---|
 | `MONTHLY_BUDGET_USD` | budget per persona al mese, in dollari, per chi non ne ha uno proprio | `3` |
 | `DAILY_BUDGET_USD` | tetto giornaliero per tutti insieme | `5` |
+| `OPEN_SIGNUP` | `true` per far registrare chiunque senza invito (quando l'app sarà aperta al pubblico) | non impostata: serve un invito |
+| `MAIL_FROM` | mittente delle email di reset, es. `Ricettario <noreply@tuodominio.it>`; serve insieme a `RESEND_API_KEY` | nessuna email |
 
-Gli utenti **non** si mettono nei segreti: si creano con un comando (passo 5), senza rifare il deploy. (Il segreto `USERS` con un JSON nome→password resta accettato per compatibilità: quegli utenti vengono creati nel database alla prima richiesta.)
+Per il reset della password via email serve un account su https://resend.com (gratuito fino a 3 000 email al mese) con un dominio verificato: la chiave va nel segreto `RESEND_API_KEY`. Senza, "Password dimenticata" nell'app spiega di chiedere un link a chi gestisce; il link lo generi tu (passo 5).
+
+Gli utenti **non** si mettono nei segreti: si invitano con un comando (passo 5), senza rifare il deploy. (Il segreto `USERS` con un JSON nome→password resta accettato per compatibilità: quelle persone entrano dalla pagina di accesso con nome e password.)
 
 ## 4. Rifai il deploy
 
 Segreti e binding valgono solo per i deploy successivi: **Deployments** → sui tre puntini dell'ultimo deploy → **Retry deployment**. Da qui in poi ogni push su `main` pubblica da solo.
 
-## 5. Crea gli utenti e verifica
+## 5. Registrati, invita e verifica
 
 Dal terminale del computer. Prima lo stato:
 
@@ -60,43 +64,47 @@ Dal terminale del computer. Prima lo stato:
 curl https://ricettario.pages.dev/api/health
 ```
 
-Deve rispondere `{"ok":true,"database":true,"key":true,"admin":true,...}`: `database` dice che D1 è collegato, `key` che la chiave c'è, `admin` che la password amministratore è impostata.
+Deve rispondere `{"ok":true,"database":true,"key":true,"admin":true,"signup":"invite","mail":false,...}`: `database` dice che D1 è collegato, `key` che la chiave c'è, `admin` che la password amministratore è impostata, `signup` che si entra su invito, `mail` se le email di reset sono configurate.
 
-Poi un utente per persona (il nome: minuscolo, senza spazi). La password la genera il server e la mostra una volta sola: copiala subito.
+Poi un invito per te stesso. **Il primo account che si registra diventa amministratore**: registrati tu prima di invitare gli altri.
 
 ```bash
 curl -X POST -H "x-admin-token: LA_TUA_PASSWORD_ADMIN" -H "content-type: application/json" \
-  -d '{"name":"paolo"}' https://ricettario.pages.dev/api/admin/users
+  -d '{"email":"tu@esempio.it"}' https://ricettario.pages.dev/api/admin/invites
 ```
 
-Risposta: `{"id":"u_…","name":"paolo","plan":"tester","password":"farro-nuvola-brocca-timo-41",…}`. Si può passare anche `"budgetUsd": 5` per un budget diverso dal predefinito, o `"password": "…"` per sceglierla.
+Risposta: `{"code":"inv_…","link":"https://ricettario.pages.dev/registrati?invito=inv_…","days":14,…}`. Apri il link sul telefono, scegli una password (almeno 10 caratteri, va bene una frase) e sei dentro. Un invito vale una registrazione e scade dopo 14 giorni (`"days": 30` per cambiare). Senza `"email"` l'invito vale per chiunque lo apra; con, solo per quell'indirizzo. Si può aggiungere `"budgetUsd": 5` per un budget diverso dal predefinito e `"plan": "…"` per il piano.
+
+Per ogni persona da invitare, lo stesso comando con la sua email: le mandi il link (il modello del messaggio è in `docs/BENVENUTO-TESTER.md`). Da amministratore puoi farlo anche dall'app, con la tua sessione al posto del token: stesse rotte, header `x-api-key` con il token che l'app conserva, ma il terminale resta la via più comoda.
 
 Altri comandi dell'amministratore:
 
 ```bash
 # consumi del mese per persona e totale di oggi (aggiungi ?month=2026-09 per un mese passato)
 curl -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/usage
-# elenco utenti
+# elenco utenti (nome, email, ruolo, piano, budget, ultimo accesso) e inviti emessi
 curl -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/users
-# nuova password, sospensione, riattivazione
-curl -X POST -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/users/paolo/reset
-curl -X POST -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/users/paolo/disable
-curl -X POST -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/users/paolo/enable
+curl -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/invites
+# password dimenticata senza email configurata: link di reset da mandare alla persona, vale un'ora
+curl -X POST -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/users/anna/reset-link
+# sospensione (chiude anche le sessioni aperte), riattivazione, ruolo
+curl -X POST -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/users/anna/disable
+curl -X POST -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/users/anna/enable
+curl -X POST -H "x-admin-token: …" -H "content-type: application/json" -d '{"role":"admin"}' https://ricettario.pages.dev/api/admin/users/anna/role
+# tester senza email: utente con password generata dal server (entra dalla pagina di accesso con nome e password)
+curl -X POST -H "x-admin-token: …" -H "content-type: application/json" -d '{"name":"nonna"}' https://ricettario.pages.dev/api/admin/users
+curl -X POST -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/users/nonna/reset
 ```
 
-Verifica come utente:
+Il nome che compare negli elenchi (`anna`, `marta-rossi`) è ricavato dal nome o dall'email alla registrazione.
 
-```bash
-curl -H "x-api-key: farro-nuvola-brocca-timo-41" https://ricettario.pages.dev/api/me
-```
+Nell'app, dopo l'accesso: *Impostazioni → Account* mostra con chi sei collegato, "Il tuo mese: 0,00 $ su 3,00 $", i **dispositivi collegati** (ognuno si può scollegare), "Cambia password" ed "Esci"; la sezione **Sincronizzazione** mostra "Ultima sincronizzazione" e il numero di ricette sul server. Fai una domanda a una ricetta e ricontrolla: il costo è aggiornato.
 
-Risponde con utente, piano, mese, budget, consumo (zero all'inizio) e quante righe ha sul server.
-
-Poi nell'app: *Impostazioni → Assistente AI*, inserisci la tua password e salva. Compaiono "Il tuo mese: 0,00 $ su 3,00 $" e la sezione **Sincronizzazione** con "Ultima sincronizzazione" e il numero di ricette sul server. Fai una domanda a una ricetta e ricontrolla: il costo è aggiornato.
+Cosa fa il server per la sicurezza: hash lento delle password (PBKDF2, 100 000 iterazioni), token di sessione casuali conservati solo come hash e validi 90 giorni dall'ultimo uso, blocco di un quarto d'ora dopo cinque tentativi sbagliati (per account e per indirizzo IP), reset monouso che chiude le altre sessioni, cambio password che scollega gli altri dispositivi.
 
 ## 6. Porta le tue ricette dal vecchio indirizzo
 
-Sul telefono, apri la vecchia app su GitHub Pages, *Impostazioni → Esporta tutto*, salva il file; apri la nuova su `pages.dev`, inserisci la password, poi *Impostazioni → Importa da file*. Da quel momento le ricette sono sul server: su qualsiasi altro dispositivo basta installare l'app e inserire la stessa password. Poi "Aggiungi alla schermata Home" dal nuovo indirizzo e togli la vecchia icona.
+Sul telefono, apri la vecchia app su GitHub Pages, *Impostazioni → Esporta tutto*, salva il file; apri la nuova su `pages.dev`, accedi, poi *Impostazioni → Importa da file*. Da quel momento le ricette sono sul server: su qualsiasi altro dispositivo basta installare l'app e accedere con lo stesso account. Poi "Aggiungi alla schermata Home" dal nuovo indirizzo e togli la vecchia icona.
 
 ## Dopo
 
@@ -105,4 +113,4 @@ Sul telefono, apri la vecchia app su GitHub Pages, *Impostazioni → Esporta tut
 - **GitHub Pages** può restare acceso come specchio o essere spento da *Settings → Pages* del repository. Il workflow `.github/workflows/deploy.yml` non dà fastidio.
 - **Cambiare budget**: modifica `MONTHLY_BUDGET_USD` e rifai il deploy. Il conteggio riparte da solo il primo di ogni mese.
 - **Il worker a sé** (`proxy/cloudflare-worker.js`) resta per chi usa l'app da un altro host: stesso codice, stesse variabili; per D1 serve il binding `DB` nel suo `wrangler.toml`.
-- **Verso il pubblico**: quando l'app uscirà dalla cerchia dei tester, la creazione degli utenti via amministratore si sostituirà con una registrazione con email; tabelle e sincronizzazione restano le stesse.
+- **Verso il pubblico**: quando i test saranno andati bene, basta impostare `OPEN_SIGNUP` = `true` (e configurare le email di reset): la registrazione si apre a tutti con piano `free`, senza altre modifiche. Prima conviene un'informativa privacy e un dominio proprio.

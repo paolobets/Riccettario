@@ -3,7 +3,11 @@ import type { AiSettings } from './settings'
 /** Consumo del mese di chi usa l'app, come lo riporta il proxy (rotta GET /me). */
 export interface Account {
   user: string
+  email?: string | null
+  role?: string
   plan?: string
+  /** Vero se la chiave è un token di sessione (accesso con email), falso per la password dei tester. */
+  session?: boolean
   month: string
   budgetUsd: number
   /** `null` se il server non ha il database: niente misura. */

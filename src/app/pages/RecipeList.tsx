@@ -3,12 +3,15 @@ import { Link } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { activeDuration, formatDuration, totalDuration } from '@/core'
+import { HOSTED } from '@/ai/settings'
+import { useSignedIn } from '@/auth/session'
 import Icon from '../components/Icon'
 
 export default function RecipeList() {
   const recipes = useLiveQuery(() => db.recipes.orderBy('updatedAt').reverse().toArray(), [])
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
+  const signedIn = useSignedIn()
 
   const tags = useMemo(() => {
     const s = new Set<string>()
@@ -36,6 +39,19 @@ export default function RecipeList() {
   return (
     <div className="space-y-4">
       <h1 className="sr-only">Ricette</h1>
+      {HOSTED && signedIn === false && (
+        <div className="notice flex flex-wrap items-center justify-between gap-2 bg-info-soft text-info">
+          <span>Accedi per usare l'assistente e ritrovare le ricette su ogni dispositivo.</span>
+          <span className="flex gap-2">
+            <Link to="/accedi" className="btn-primary min-h-10 px-3 py-1 text-sm">
+              Accedi
+            </Link>
+            <Link to="/registrati" className="btn-secondary min-h-10 px-3 py-1 text-sm">
+              Crea l'account
+            </Link>
+          </span>
+        </div>
+      )}
       <label className="relative block">
         <span className="sr-only">Cerca per titolo o ingrediente</span>
         <Icon name="search" size={18} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />

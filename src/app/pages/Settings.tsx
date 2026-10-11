@@ -6,6 +6,7 @@ import { fetchAccount, type Account } from '@/ai/account'
 import { syncNow, useSyncStatus } from '@/data/sync'
 import { loadTheme, saveTheme, type Theme } from '../theme'
 import Icon from '../components/Icon'
+import AccountSection from '../components/AccountSection'
 
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -74,21 +75,33 @@ export default function Settings() {
         </div>
         <p className="text-xs text-muted">Automatico segue le impostazioni del dispositivo.</p>
       </section>
+      {HOSTED && (
+        <AccountSection
+          account={account}
+          onChange={() => {
+            loadAiSettings().then((s) => {
+              setAi(s)
+              fetchAccount(s).then(setAccount)
+            })
+          }}
+        />
+      )}
       <section className="rule space-y-3 pt-4">
         <h2 className="section-title text-lg">Assistente AI</h2>
         <p className="text-sm text-muted">
           {HOSTED
-            ? 'Serve per importare ricette da testo, foto e siti, fare domande e creare varianti. Le richieste passano dal server dell\'app con una chiave condivisa: inserisci la password personale che hai ricevuto. Ogni persona ha un budget mensile.'
+            ? 'Serve per importare ricette da testo, foto e siti, fare domande e creare varianti. Le richieste passano dal server dell\'app con una chiave condivisa; ogni persona ha un budget mensile, visibile nel blocco Account.'
             : 'Serve per importare ricette da testo e foto, fare domande e creare varianti. La chiave resta solo su questo dispositivo e viene inviata esclusivamente ad Anthropic (o al tuo proxy). Ogni richiesta ha un costo sul tuo account.'}
         </p>
+        {!HOSTED && (
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-fg-2">{HOSTED ? 'La tua password del Ricettario' : 'Chiave API Anthropic'}</span>
+          <span className="mb-1 block font-medium text-fg-2">Chiave API Anthropic</span>
           <div className="flex gap-2">
             <input
               className="min-w-0 flex-1 font-mono text-sm"
               type={showKey ? 'text' : 'password'}
               autoComplete="off"
-              placeholder={HOSTED ? 'la password che hai ricevuto' : 'sk-ant-…'}
+              placeholder="sk-ant-…"
               value={ai.apiKey}
               onChange={(e) => {
                 setAi({ ...ai, apiKey: e.target.value })
@@ -100,6 +113,7 @@ export default function Settings() {
             </button>
           </div>
         </label>
+        )}
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-fg-2">Modello</span>
           <select className="w-full" value={ai.model} onChange={(e) => { setAi({ ...ai, model: e.target.value }); setAiSaved(false) }}>
@@ -148,7 +162,7 @@ export default function Settings() {
           </button>
           {aiSaved && <span className="text-sm text-success">Salvato.</span>}
         </div>
-        {account && (
+        {!HOSTED && account && (
           <div className="rounded-lg bg-surface-2 p-3 text-sm text-fg-2" role="status">
             {account.usage ? (
               <>
@@ -191,7 +205,7 @@ export default function Settings() {
         <section className="rule space-y-3 pt-4">
           <h2 className="section-title text-lg">Sincronizzazione</h2>
           <p className="text-sm text-muted">
-            Ricette, diario e conversazioni vengono copiati sul server sotto la tua password e ritrovati su ogni dispositivo in cui la inserisci. Se la stessa
+            Ricette, diario e conversazioni vengono copiati sul server sotto il tuo account e ritrovati su ogni dispositivo in cui accedi. Se la stessa
             ricetta è stata modificata su due dispositivi, vince la modifica più recente.
           </p>
           <p className="text-sm text-fg-2" role="status">
