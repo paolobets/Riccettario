@@ -20,7 +20,10 @@ export default function ShoppingPage() {
     const byId = new Map(recipes.map((r) => [r.id, r]))
     return list.entries.map((e) => ({ recipe: byId.get(e.recipeId), factor: e.factor })).filter((e): e is { recipe: Recipe; factor: number } => Boolean(e.recipe))
   }, [list, recipes])
-  const lines = useMemo(() => buildShoppingList(entries), [entries])
+  const lines = useMemo(() => {
+    const byId = new Map((recipes ?? []).map((r) => [r.id, r]))
+    return buildShoppingList(entries, (id) => byId.get(id))
+  }, [entries, recipes])
   // Spunte in stato locale, aggiornate subito; il database segue.
   const [checked, setChecked] = useState<Set<string>>(() => new Set())
   const storedChecked = list?.checked

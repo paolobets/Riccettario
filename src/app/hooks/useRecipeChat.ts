@@ -4,6 +4,13 @@ import { deleteChat, saveChat } from '@/data/repo'
 import { newId, type Recipe } from '@/core'
 import type { ChatTurn } from '@/ai/assist'
 
+/** Le ricette usate come basi da questa, per darle all'assistente. */
+export async function loadBases(recipe: Recipe): Promise<Recipe[]> {
+  const ids = [...new Set(recipe.ingredients.map((i) => i.recipeId).filter((x): x is string => Boolean(x)))]
+  if (ids.length === 0) return []
+  return (await db.recipes.bulkGet(ids)).filter((r): r is Recipe => Boolean(r))
+}
+
 /**
  * Conversazione con l'assistente per una ricetta, persistita in Dexie:
  * si ritrova riaprendo la ricetta, anche dalla modalità cucina.
@@ -36,13 +43,14 @@ export function useRecipeChat(recipe: Recipe, factor: number) {
       setBusy(true)
       setPartial('')
       try {
-        const [{ askAboutRecipe }, sessions] = await Promise.all([
+        const [{ askAboutRecipe }, sessions, bases] = await Promise.all([
           import('@/ai/assist'),
           db.sessions.where('recipeId').equals(recipe.id).toArray(),
+          loadBases(recipe),
         ])
         let acc = ''
         const history: ChatTurn[] = chat.turns.map((t) => ({ role: t.role, text: t.text }))
-        const { text, costUsd } = await askAboutRecipe({ recipe, factor, sessions, history, question, stepContext }, (d) => {
+        const { text, costUsd } = await askAboutRecipe({ recipe, factor, sessions, history, question, stepContext, bases }, (d) => {
           acc += d
           setPartial(acc)
         })

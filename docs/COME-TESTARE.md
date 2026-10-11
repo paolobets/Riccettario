@@ -53,6 +53,13 @@ Su pages.dev le ricette si sincronizzano tra i dispositivi in cui fai l'accesso.
 - [ ] In una ricetta con porzioni cambiate, "Condividi": sul telefono si apre il foglio di condivisione con il testo (dosi già riscalate) e un link; sul computer finisce negli appunti. Apri il link in un altro browser: la pagina "Ricetta condivisa con te" la salva come copia.
 - [ ] "Stampa" (o Ctrl+P): nell'anteprima ci sono solo titolo, ingredienti, passaggi e note, senza bottoni né barra.
 
+### 2f. Basi, componi, scomponi, etichetta
+- [ ] Apri il Tiramisù → "Scomponi": la sezione Crema è già selezionata; chiama la base "Crema al mascarpone" e crea. Nel Tiramisù ora c'è "1 dose di crema al mascarpone" con la sezione **Basi** sotto gli ingredienti; porta le porzioni a 16: la base passa a ×2 e "Spiana le basi" mostra 1 kg di mascarpone.
+- [ ] "Aggiungi alla spesa": nella lista compaiono mascarpone e uova, non "crema". In "Cucina passo per passo" c'è **Basi da preparare** con il link alla crema già riscalata.
+- [ ] "+ Nuova" → "Componi da basi": scegli due ricette, una con resa (va a grammi) e una senza (va a dosi), dai un titolo e continua: il wizard ha le basi tra gli ingredienti. Nel wizard della crema, "Aggiungi una base" non propone il Tiramisù (farebbe un giro).
+- [ ] "Etichetta" dal Tiramisù: gli ingredienti sono in ordine di peso, la crema tra parentesi con i suoi, gli allergeni in maiuscolo e "Contiene: glutine, uova, latte". Spunta o togli un allergene, scrivi peso netto e durata, salva: ricaricando restano. Carica un logo, scegli il formato e "Stampa o salva PDF": nell'anteprima di stampa ci sono solo le etichette.
+- [ ] Elimina la base: la conferma dice che è usata dal Tiramisù; dopo, nel Tiramisù la crema è tornata un ingrediente semplice.
+
 ### 3. Cosa preparo? (nessuna chiave)
 - [ ] Dalla lista, "Cosa preparo oggi?". Scegli "45 minuti" e scrivi "uova, pecorino": la proposta è la carbonara con "Hai già pecorino". "Un'altra" scorre le alternative.
 - [ ] Scegli "20 minuti": nessuna ricetta sta nel tempo; "Togli il limite di tempo" e "Fatti scrivere una ricetta" (porta a Importa → Piatto).

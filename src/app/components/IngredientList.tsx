@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import {
+  formatDoses,
+  isDoseUnit,
   formatAmount,
   formatQuantity,
   formatUnit,
@@ -17,6 +20,8 @@ interface Props {
   checkable?: boolean
   /** Se dato, le spunte sopravvivono al ricaricamento e alla chiusura dell'app (localStorage). */
   storageKey?: string
+  /** Per gli ingredienti che sono basi: dove porta il nome e con che fattore. */
+  baseLinks?: Record<string, { to: string; label: string }>
 }
 
 function groupBySection(items: ScaledIngredient[]): Array<[string | undefined, ScaledIngredient[]]> {
@@ -44,7 +49,7 @@ function isPivotable(ing: ScaledIngredient): boolean {
   return Boolean(ing.scaled) && ing.scaled!.unit !== 'q.b.' && ing.scaling?.mode !== 'fixed' && ing.scaling?.mode !== 'toTaste'
 }
 
-export default function IngredientList({ scaled, onPivot, checkable, storageKey }: Props) {
+export default function IngredientList({ scaled, onPivot, checkable, storageKey, baseLinks }: Props) {
   const [editing, setEditing] = useState<string | null>(null)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -103,6 +108,8 @@ export default function IngredientList({ scaled, onPivot, checkable, storageKey 
               const pivotable = Boolean(onPivot) && isPivotable(ing)
               const showOriginal = isScaled && ing.original && ing.scaled && isPivotable(ing)
               const Row = checkable ? 'label' : 'div'
+              const qtyText = d ? (ing.recipeId && isDoseUnit(d.unit) ? formatDoses(d.amount) : formatQuantity(d)) : ''
+              const baseLink = ing.recipeId ? baseLinks?.[ing.id] : undefined
               return (
                 <li
                   key={ing.id}
@@ -115,7 +122,7 @@ export default function IngredientList({ scaled, onPivot, checkable, storageKey 
                         className="mt-0.5 h-6 w-6 shrink-0 accent-accent"
                         checked={done}
                         onChange={() => toggle(ing.id)}
-                        aria-label={`${ing.name}${d ? `, ${formatQuantity(d)}` : ''}`}
+                        aria-label={`${ing.name}${d ? `, ${qtyText}` : ''}`}
                       />
                     )}
                     <div className="text-right">
@@ -123,16 +130,16 @@ export default function IngredientList({ scaled, onPivot, checkable, storageKey 
                         <button
                           className="qty inline-flex min-h-8 items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-[17px] leading-tight font-semibold text-accent-text transition hover:bg-accent-soft"
                           onClick={() => startEdit(ing)}
-                          aria-label={`Cambia la quantità di ${ing.name}, ora ${formatQuantity(d)}`}
+                          aria-label={`Cambia la quantità di ${ing.name}, ora ${qtyText}`}
                           title={ing.warning ?? 'Scrivi quanto ne hai: il resto si adatta'}
                         >
-                          <span className={ing.adjusted ? 'text-warning' : ''}>{formatQuantity(d)}</span>
+                          <span className={ing.adjusted ? 'text-warning' : ''}>{qtyText}</span>
                           <Icon name="edit" size={12} className="text-muted" />
                         </button>
                       )}
                       {d && !isEditing && !pivotable && (
                         <span className={`qty inline-block px-1.5 py-0.5 text-[17px] leading-tight font-semibold ${ing.adjusted ? 'text-warning' : 'text-fg'}`} title={ing.warning}>
-                          {formatQuantity(d)}
+                          {qtyText}
                         </span>
                       )}
                       {d && isEditing && (
@@ -159,7 +166,17 @@ export default function IngredientList({ scaled, onPivot, checkable, storageKey 
                     </div>
                     <div className="min-w-0 flex-1">
                       <span className={done ? 'line-through' : ''}>
-                        {ing.name}
+                        {baseLink ? (
+                          <Link to={baseLink.to} className="inline-flex items-center gap-1 text-accent-text underline-offset-2 hover:underline" title={baseLink.label}>
+                            <Icon name="book" size={14} /> {ing.name}
+                          </Link>
+                        ) : ing.recipeId ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="book" size={14} className="text-muted" /> {ing.name}
+                          </span>
+                        ) : (
+                          ing.name
+                        )}
                         {ing.optional && <span className="text-muted"> (facoltativo)</span>}
                       </span>
                       {ing.note && <span className="text-sm text-muted">, {ing.note}</span>}

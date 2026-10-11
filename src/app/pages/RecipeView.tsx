@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { addToShoppingList, deleteRecipe, duplicateRecipe, saveRecipe, toggleFavorite } from '@/data/repo'
-import { activeDuration, encodeRecipeForLink, formatDuration, formatPan, recipeToText, STEP_TYPE_LABELS, totalDuration } from '@/core'
+import { activeDuration, encodeRecipeForLink, flattenIngredients, formatDuration, formatFactor, formatPan, recipeToText, resolveBases, scaleRecipe, STEP_TYPE_LABELS, totalDuration, usedAsBaseIn } from '@/core'
 import { clearCookState, loadCookState, type CookState } from '../cook/state'
 import { useScaler } from '../hooks/useScaler'
 import ScalerPanel from '../components/ScalerPanel'
@@ -34,8 +34,10 @@ export default function RecipeView() {
     () => (id ? db.sessions.where('recipeId').equals(id).filter((s) => Boolean(s.finishedAt)).reverse().sortBy('startedAt') : []),
     [id],
   )
+  const allRecipes = useLiveQuery(() => db.recipes.toArray(), [])
   const scaler = useScaler(recipe ?? undefined)
   const { confirm, dialog } = useConfirm()
+  const [flat, setFlat] = useState(false)
   /** Testo della nota in modifica; `null` quando non si sta modificando. */
   const [notesDraft, setNotesDraft] = useState<string | null>(null)
   const [cook, setCook] = useState<CookState | null>(() => (id ? loadCookState(id) : null))
@@ -44,6 +46,13 @@ export default function RecipeView() {
   if (recipe === undefined) return null
   if (recipe === null || !scaler.scaled) return <NotFound what="ricetta" />
   const scaled = scaler.scaled
+  const byId = new Map((allRecipes ?? []).map((r) => [r.id, r]))
+  const lookup = (rid: string) => byId.get(rid)
+  const bases = resolveBases(scaled.ingredients, lookup)
+  const baseLinks = Object.fromEntries(
+    bases.filter((b) => b.base && b.factor).map((b) => [b.ingredient.id, { to: `/ricetta/${b.base!.id}${Math.abs(b.factor! - 1) > 1e-9 ? `?f=${Math.round(b.factor! * 10000) / 10000}` : ''}`, label: `Apri «${b.base!.title}» ${formatFactor(b.factor!)}` }]),
+  )
+  const parents = allRecipes ? usedAsBaseIn(allRecipes, recipe.id) : []
   const total = totalDuration(recipe.steps)
   const active = activeDuration(recipe.steps)
   const cookLink = `/ricetta/${recipe.id}/cucina${scaler.search ? `?${scaler.search}` : ''}`
@@ -107,7 +116,7 @@ export default function RecipeView() {
               onClick={async () => {
                 const ok = await confirm({
                   title: `Eliminare «${recipe.title}»?`,
-                  body: 'Spariscono anche il diario di cottura e le conversazioni. Non si può annullare.',
+                  body: `Spariscono anche il diario di cottura e le conversazioni.${parents.length ? ` È una base di ${parents.map((p) => `«${p.title}»`).join(', ')}: lì resterà come ingrediente semplice.` : ''} Non si può annullare.`,
                   confirmLabel: 'Elimina ricetta',
                   cancelLabel: 'Tieni',
                   danger: true,
@@ -183,6 +192,9 @@ export default function RecipeView() {
         <button className="btn-secondary min-h-10 px-3 py-1.5 text-sm" onClick={() => window.print()}>
           <Icon name="printer" size={16} /> Stampa
         </button>
+        <Link to={`/ricetta/${recipe.id}/etichetta${scaler.search ? `?${scaler.search}` : ''}`} className="btn-secondary min-h-10 px-3 py-1.5 text-sm">
+          <Icon name="tag" size={16} /> Etichetta
+        </Link>
       </div>
       {message && (
         <p className="text-sm text-fg-2 print:hidden" role="status">
@@ -213,9 +225,69 @@ export default function RecipeView() {
       </div>
 
       <section className="rule pt-4">
-        <h2 className="section-title mb-2">Ingredienti</h2>
-        <IngredientList scaled={scaled} onPivot={scaler.setPivot} />
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="section-title">Ingredienti</h2>
+          <div className="flex gap-1 print:hidden">
+            {bases.some((b) => b.factor) && (
+              <button className="btn-ghost min-h-9 px-2 py-1 text-sm" onClick={() => setFlat(!flat)} aria-pressed={flat}>
+                {flat ? 'Mostra le basi' : 'Spiana le basi'}
+              </button>
+            )}
+            {recipe.ingredients.length > 1 && (
+              <Link to={`/ricetta/${recipe.id}/scomponi${recipe.sections?.[0] ? `?sezione=${encodeURIComponent(recipe.sections[0])}` : ''}`} className="btn-ghost min-h-9 px-2 py-1 text-sm">
+                Scomponi
+              </Link>
+            )}
+          </div>
+        </div>
+        {flat ? <IngredientList scaled={{ ...scaled, ingredients: flattenIngredients(recipe, scaled.factor, lookup), warnings: [] }} /> : <IngredientList scaled={scaled} onPivot={scaler.setPivot} baseLinks={baseLinks} />}
       </section>
+
+      {bases.length > 0 && !flat && (
+        <section className="rule pt-4">
+          <h2 className="section-title mb-1">Basi</h2>
+          <p className="mb-3 text-sm text-muted">Ricette a parte che entrano in questa, già riscalate per quanto ne serve.</p>
+          <ul className="space-y-4">
+            {bases.map((b) => (
+              <li key={b.ingredient.id} className="space-y-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <h3 className="font-display text-xl font-medium text-fg">
+                    {b.base ? (
+                      <Link to={baseLinks[b.ingredient.id]?.to ?? `/ricetta/${b.base.id}`} className="hover:text-accent-text">
+                        {b.base.title}
+                      </Link>
+                    ) : (
+                      b.ingredient.name
+                    )}
+                    {b.factor ? <span className="qty ml-2 text-base text-muted">{formatFactor(b.factor)}</span> : null}
+                  </h3>
+                  {b.base && b.factor && (
+                    <Link to={`/ricetta/${b.base.id}/cucina${Math.abs(b.factor - 1) > 1e-9 ? `?f=${Math.round(b.factor * 10000) / 10000}` : ''}`} className="btn-ghost min-h-9 px-2 py-1 text-sm print:hidden">
+                      <Icon name="chef" size={16} /> Prepara
+                    </Link>
+                  )}
+                </div>
+                {b.problem && (
+                  <p className="notice flex items-start gap-2 bg-warning-soft text-warning">
+                    <Icon name="alert" size={16} className="mt-0.5" /> <span>{b.problem}</span>
+                  </p>
+                )}
+                {b.base && b.factor && (
+                  <div className="border-l-2 border-line pl-3">
+                    <IngredientList scaled={scaleRecipe(b.base, b.factor)} />
+                    {totalDuration(b.base.steps) > 0 && (
+                      <p className="mt-1 text-xs text-muted">
+                        <Icon name="timer" size={12} className="mr-1 inline" />
+                        {formatDuration(totalDuration(b.base.steps))}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="rule pt-4">
         <h2 className="section-title mb-3">Preparazione</h2>

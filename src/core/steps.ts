@@ -46,7 +46,7 @@ export function renderStep(step: Step, scaled: ScaledRecipe): StepSegment[] {
       out.push({ kind: 'missing', id, text: id })
     } else {
       const nameOnly = modifier !== undefined
-      const text = nameOnly ? ing.name : formatIngredientLine(ing.name, ing.scaled)
+      const text = nameOnly ? ing.name : formatIngredientLine(ing.name, ing.scaled, Boolean(ing.recipeId))
       out.push({ kind: 'ingredient', ingredient: ing, text, nameOnly })
     }
     last = start + m[0].length

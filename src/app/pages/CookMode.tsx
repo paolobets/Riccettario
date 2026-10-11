@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { recordSession } from '@/data/repo'
@@ -14,6 +14,10 @@ import {
   renderStepPlain,
   STEP_TYPE_LABELS,
   upcomingStarts,
+  resolveBases,
+  formatDoses,
+  isDoseUnit,
+  formatQuantity,
   type Plan,
 } from '@/core'
 import { useScaler } from '../hooks/useScaler'
@@ -76,6 +80,7 @@ export default function CookMode() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const recipe = useLiveQuery(async () => (id ? ((await db.recipes.get(id)) ?? null) : null), [id])
+  const allRecipes = useLiveQuery(() => db.recipes.toArray(), [])
   const scaler = useScaler(recipe ?? undefined)
   const [rating, setRating] = useState(0)
   const [notes, setNotes] = useState('')
@@ -170,6 +175,8 @@ export default function CookMode() {
   back.delete('passo')
   const recipeLink = `/ricetta/${recipe.id}${back.size ? `?${back}` : ''}`
   const late = plan ? Math.round((Date.now() - plan.startAt.getTime()) / 60_000) : 0
+  const byId = new Map((allRecipes ?? []).map((r) => [r.id, r]))
+  const bases = resolveBases(scaled.ingredients, (rid) => byId.get(rid)).filter((b) => b.base && b.factor)
 
   const begin = () => {
     if (!cook) updateCook({ startedAt: new Date().toISOString() })
@@ -249,6 +256,28 @@ export default function CookMode() {
             <div className="card">
               <IngredientList scaled={scaled} checkable storageKey={`${cookStateKey(recipe.id)}:spunte`} />
             </div>
+            {bases.length > 0 && (
+              <div className="rule pt-3">
+                <h2 className="section-title mb-1 text-lg">Basi da preparare</h2>
+                <ul className="space-y-1">
+                  {bases.map((b) => (
+                    <li key={b.ingredient.id}>
+                      <Link
+                        to={`/ricetta/${b.base!.id}/cucina${Math.abs(b.factor! - 1) > 1e-9 ? `?f=${Math.round(b.factor! * 10000) / 10000}` : ''}`}
+                        className="flex min-h-11 items-center justify-between gap-3 rounded-lg px-2 py-1 text-fg-2 hover:bg-surface-2"
+                      >
+                        <span>
+                          <Icon name="book" size={14} className="mr-1 inline text-muted" />
+                          {b.base!.title}, {b.ingredient.scaled ? (isDoseUnit(b.ingredient.scaled.unit) ? formatDoses(b.ingredient.scaled.amount) : formatQuantity(b.ingredient.scaled)) : ''}
+                        </span>
+                        <span className="qty shrink-0 text-sm text-muted">{formatFactor(b.factor!)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-xs text-muted">Se le hai già pronte, vai avanti: le trovi anche spuntate qui sopra.</p>
+              </div>
+            )}
             {recipe.steps.some((s) => s.equipment?.length) && (
               <div className="rule pt-3">
                 <h2 className="section-title mb-1 text-lg">Attrezzatura</h2>

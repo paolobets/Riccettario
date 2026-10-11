@@ -20,7 +20,7 @@ export function recipeToText(scaled: ScaledRecipe): string {
       section = i.section
       out.push(`${section}:`)
     }
-    out.push(`- ${formatIngredientLine(i.name, i.scaled)}${i.note ? `, ${i.note}` : ''}${i.optional ? ' (facoltativo)' : ''}`)
+    out.push(`- ${formatIngredientLine(i.name, i.scaled, Boolean(i.recipeId))}${i.recipeId ? ' (ricetta a parte)' : ''}${i.note ? `, ${i.note}` : ''}${i.optional ? ' (facoltativo)' : ''}`)
   }
   out.push('', 'PREPARAZIONE')
   r.steps.forEach((s, idx) => {

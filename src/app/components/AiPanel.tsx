@@ -5,7 +5,7 @@ import { isAiConfigured, loadAiSettings } from '@/ai/settings'
 import { db } from '@/data/db'
 import { saveRecipe } from '@/data/repo'
 import { newId, type Recipe } from '@/core'
-import { useRecipeChat } from '../hooks/useRecipeChat'
+import { loadBases, useRecipeChat } from '../hooks/useRecipeChat'
 import ChatThread from './ChatThread'
 import Icon from './Icon'
 
@@ -48,7 +48,7 @@ export default function AiPanel({ recipe, factor }: Props) {
     setVariantBusy(true)
     try {
       const { proposeVariant } = await import('@/ai/assist')
-      const { recipe: v, warnings, costUsd } = await proposeVariant({ recipe, sessions, instruction })
+      const { recipe: v, warnings, costUsd } = await proposeVariant({ recipe, sessions, instruction, bases: await loadBases(recipe) })
       const saved = await saveRecipe({ ...v, id: newId('r'), title: v.title === recipe.title ? `${v.title} (variante)` : v.title })
       navigate(`/ricetta/${saved.id}`, { state: { warnings, costUsd } })
     } catch (e) {

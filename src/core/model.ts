@@ -68,6 +68,8 @@ export interface Ingredient {
   /** Sezione di appartenenza (impasto, farcitura, ...). */
   section?: string
   optional?: boolean
+  /** Se presente, l'ingrediente è un'altra ricetta (una base): la quantità dice quanta prepararne. */
+  recipeId?: string
 }
 
 export type StepType = 'prep' | 'cook' | 'rest' | 'wait' | 'serve'
@@ -104,6 +106,19 @@ export interface Yield {
 /** Teglia o stampo per cui è scritta la ricetta: cambiandola il fattore è il rapporto tra le aree. */
 export type Pan = { shape: 'round'; diameterCm: number } | { shape: 'rect'; widthCm: number; lengthCm: number }
 
+/** Dati dell'etichetta da stampare, oltre a ciò che si ricava dagli ingredienti. */
+export interface LabelInfo {
+  /** Allergeni confermati a mano; se assente valgono quelli riconosciuti dai nomi. */
+  allergens?: string[]
+  /** "Può contenere tracce di …" */
+  mayContain?: string
+  netWeight?: string
+  storage?: string
+  producer?: string
+  /** Giorni di durata dalla produzione, per la data di scadenza. */
+  shelfLifeDays?: number
+}
+
 export interface Recipe {
   id: string
   title: string
@@ -116,6 +131,7 @@ export interface Recipe {
   pan?: Pan
   /** Segnata con la stella. */
   favorite?: boolean
+  label?: LabelInfo
   tags: string[]
   sections?: string[]
   ingredients: Ingredient[]

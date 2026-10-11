@@ -6,11 +6,12 @@ import type { Recipe } from './model'
 import { formatDuration } from './format'
 import { ingredientIdsInStep } from './steps'
 import { isCountUnit } from './units'
+import { baseFactor, type RecipeLookup } from './compose'
 
 const LONG_STEP_MINUTES = 10
 const LONG_REST_MINUTES = 20
 
-export function checkRecipe(recipe: Recipe): string[] {
+export function checkRecipe(recipe: Recipe, lookup?: RecipeLookup): string[] {
   const out: string[] = []
   if (!recipe.title.trim()) out.push('Manca il titolo.')
   if (!(recipe.servings > 0)) out.push('Le porzioni devono essere almeno 1.')
@@ -23,6 +24,18 @@ export function checkRecipe(recipe: Recipe): string[] {
     if (rule?.mode === 'bakersPercent' && (!rule.of || rule.of === i.id || !ids.has(rule.of))) out.push(`«${i.name}»: percentuale del panettiere senza ingrediente base.`)
     if (/\buov[oa]\b/i.test(i.name) && i.quantity && isCountUnit(i.quantity.unit) && rule?.mode !== 'discrete' && rule?.mode !== 'fixed')
       out.push(`«${i.name}» scala a pezzi interi: con la regola lineare potresti ritrovarti 2,6 uova. Imposta "a pezzi interi".`)
+  }
+
+  if (lookup) {
+    for (const i of recipe.ingredients) {
+      if (!i.recipeId) continue
+      const base = lookup(i.recipeId)
+      if (!base) out.push(`«${i.name}» rimanda a una ricetta che non c'è più.`)
+      else {
+        const { problem } = baseFactor(i.quantity, base)
+        if (problem) out.push(`Base «${i.name}»: ${problem}`)
+      }
+    }
   }
 
   const cited = new Set(recipe.steps.flatMap((s) => ingredientIdsInStep(s)))

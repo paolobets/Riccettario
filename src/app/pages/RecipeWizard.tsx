@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { saveRecipe } from '@/data/repo'
 import {
@@ -12,6 +13,9 @@ import {
   formatUnit,
   scaleRecipe,
   checkRecipe,
+  wouldCycle,
+  isMassUnit,
+  isVolumeUnit,
   type Pan,
   type Ingredient,
   type Recipe,
@@ -40,6 +44,8 @@ interface IngredientDraft {
   note: string
   section: string
   optional: boolean
+  /** Se è una base: id della ricetta. */
+  recipeId: string
 }
 interface StepDraft {
   id: string
@@ -55,7 +61,7 @@ interface StepDraft {
 }
 
 function emptyIngredient(): IngredientDraft {
-  return { id: newId('i'), name: '', amount: '', unit: 'g', mode: 'linear', percent: '', of: '', note: '', section: '', optional: false }
+  return { id: newId('i'), name: '', amount: '', unit: 'g', mode: 'linear', percent: '', of: '', note: '', section: '', optional: false, recipeId: '' }
 }
 function emptyStep(): StepDraft {
   return { id: newId('s'), text: '', type: '', durationMin: '', temperatureC: '', timerMinutes: '', timerLabel: '', equipment: '', section: '', parallelWith: '' }
@@ -85,6 +91,7 @@ function fromRecipe(r: Recipe) {
       note: i.note ?? '',
       section: i.section ?? '',
       optional: i.optional ?? false,
+      recipeId: i.recipeId ?? '',
     })),
     steps: r.steps.map<StepDraft>((s) => ({
       id: s.id,
@@ -132,6 +139,7 @@ function toRecipe(d: Draft, base: Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>
         note: i.note.trim() || undefined,
         section: i.section.trim() || undefined,
         optional: i.optional || undefined,
+        recipeId: i.recipeId || undefined,
       }
     })
   const steps: Step[] = d.steps
@@ -176,13 +184,14 @@ export default function RecipeWizard() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const prefill = (location.state ?? {}) as { recipe?: Recipe; warnings?: string[]; fromAi?: boolean; costUsd?: number }
-  const [phase, setPhase] = useState<Phase>(prefill.recipe ? 3 : 0)
+  const prefill = (location.state ?? {}) as { recipe?: Recipe; warnings?: string[]; fromAi?: boolean; costUsd?: number; startPhase?: Phase; composed?: boolean }
+  const [phase, setPhase] = useState<Phase>(prefill.startPhase ?? (prefill.recipe ? 3 : 0))
   const [draft, setDraft] = useState<Draft | null>(id ? null : fromRecipe(prefill.recipe ?? { ...emptyRecipe(), ingredients: [], steps: [] }))
   const [base, setBase] = useState<Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>>(() => (prefill.recipe ? { id: prefill.recipe.id, createdAt: prefill.recipe.createdAt, updatedAt: prefill.recipe.updatedAt } : emptyRecipe()))
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(Boolean(prefill.recipe))
   const { confirm, dialog } = useConfirm()
+  const allRecipes = useLiveQuery(() => db.recipes.toArray(), [])
 
   useEffect(() => {
     if (!id) return
@@ -264,10 +273,11 @@ export default function RecipeWizard() {
         </ol>
       </nav>
 
-      {phase === 0 && <PhaseInfo draft={draft} set={set} />}
-      {phase === 1 && <PhaseIngredients draft={draft} set={set} />}
+      {phase === 0 && <PhaseInfo draft={draft} set={set} isNew={!id && !prefill.recipe} />}
+      {phase === 0 && prefill.composed && <p className="text-sm text-muted">Le basi scelte sono già tra gli ingredienti: nella fase Passaggi scrivi il montaggio citandole con i bottoni.</p>}
+      {phase === 1 && <PhaseIngredients draft={draft} set={set} recipes={allRecipes ?? []} currentId={base.id} />}
       {phase === 2 && <PhaseSteps draft={draft} set={set} />}
-      {phase === 3 && <PhaseReview recipe={toRecipe(draft, base)} />}
+      {phase === 3 && <PhaseReview recipe={toRecipe(draft, base)} recipes={allRecipes ?? []} />}
 
       <div className="flex justify-between gap-3 pt-2">
         <button className="btn-secondary" onClick={() => setPhase((phase - 1) as Phase)} disabled={phase === 0}>
@@ -302,9 +312,17 @@ function Field({ label, children, hint }: { label: string; children: React.React
   )
 }
 
-function PhaseInfo({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => void }) {
+function PhaseInfo({ draft, set, isNew }: { draft: Draft; set: (p: Partial<Draft>) => void; isNew?: boolean }) {
   return (
     <section className="card space-y-3">
+      {isNew && (
+        <p className="text-sm text-muted">
+          Stai unendo ricette che hai già (frolla, crema…)?{' '}
+          <Link to="/componi" className="text-accent-text underline-offset-2 hover:underline">
+            Componi da basi
+          </Link>
+        </p>
+      )}
       <Field label="Titolo">
         <input className="w-full" value={draft.title} onChange={(e) => set({ title: e.target.value })} autoFocus />
       </Field>
@@ -354,7 +372,7 @@ function PhaseInfo({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => v
   )
 }
 
-function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => void }) {
+function PhaseIngredients({ draft, set, recipes, currentId }: { draft: Draft; set: (p: Partial<Draft>) => void; recipes: Recipe[]; currentId: string }) {
   const update = (idx: number, patch: Partial<IngredientDraft>) => {
     const next = draft.ingredients.map((i, k) => (k === idx ? { ...i, ...patch } : i))
     set({ ingredients: next })
@@ -368,6 +386,24 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
     set({ ingredients: next })
   }
   const add = () => set({ ingredients: [...draft.ingredients, emptyIngredient()] })
+  const byId = new Map(recipes.map((r) => [r.id, r]))
+  const lookup = (rid: string) => byId.get(rid)
+  const candidates = recipes.filter((r) => r.id !== currentId && !wouldCycle(lookup, currentId, r.id)).sort((a, b) => a.title.localeCompare(b.title, 'it'))
+  const addBase = (rid: string) => {
+    const r = byId.get(rid)
+    if (!r) return
+    const yieldUnit = r.yield?.unit as Unit | undefined
+    const unit: Unit = yieldUnit && isMassUnit(yieldUnit) ? 'g' : yieldUnit && isVolumeUnit(yieldUnit) ? 'ml' : ''
+    const slug = slugify(r.title) || newId('i')
+    const id = draft.ingredients.some((i) => i.id === slug) ? `${slug}-${draft.ingredients.length + 1}` : slug
+    set({ ingredients: [...draft.ingredients, { ...emptyIngredient(), id, name: r.title.toLowerCase(), unit, amount: unit ? '' : '1', recipeId: r.id }] })
+  }
+  const baseHint = (ing: IngredientDraft) => {
+    const r = byId.get(ing.recipeId)
+    if (!r) return 'La ricetta di questa base non c\'è più.'
+    const y = r.yield ? `resa ${r.yield.amount} ${r.yield.unit}` : 'senza resa: si misura a dosi'
+    return `Base: «${r.title}», ${y}.`
+  }
   const massIngredients = draft.ingredients.filter((i) => i.name.trim() && (i.unit === 'g' || i.unit === 'kg'))
 
   return (
@@ -395,6 +431,11 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
             <button className="btn-ghost h-10 w-9 shrink-0 p-0" onClick={() => move(idx, 1)} disabled={idx === draft.ingredients.length - 1} aria-label={`Sposta giù ${ing.name || 'ingrediente'}`}><Icon name="down" size={16} /></button>
             <button className="btn-ghost h-10 w-9 shrink-0 p-0 text-danger" onClick={() => remove(idx)} aria-label={`Rimuovi ${ing.name || 'ingrediente'}`}><Icon name="close" size={16} /></button>
           </div>
+          {ing.recipeId && (
+            <p className="inline-flex items-start gap-1 text-xs text-muted">
+              <Icon name="book" size={14} className="mt-0.5" /> {baseHint(ing)} In grammi o millilitri serve la resa; a dosi (nessuna unità) vale sempre.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <input
               type="number"
@@ -409,9 +450,9 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
               onChange={(e) => update(idx, { amount: e.target.value })}
             />
             <select className="min-w-0" aria-label="Unità" value={ing.unit} disabled={ing.mode === 'toTaste'} onChange={(e) => update(idx, { unit: e.target.value as Unit })}>
-              {UNITS.filter((u) => u !== 'q.b.').map((u) => (
+              {UNITS.filter((u) => u !== 'q.b.' && (!ing.recipeId || ['g', 'kg', 'ml', 'l', ''].includes(u))).map((u) => (
                 <option key={u} value={u}>
-                  {u === '' ? '(nessuna: pezzi)' : formatUnit(u, 1)}
+                  {u === '' ? (ing.recipeId ? 'dosi' : '(nessuna: pezzi)') : formatUnit(u, 1)}
                 </option>
               ))}
             </select>
@@ -459,9 +500,33 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
           <option key={s} value={s} />
         ))}
       </datalist>
-      <button className="btn-secondary w-full" onClick={add}>
-        <Icon name="plus" size={16} /> Aggiungi ingrediente
-      </button>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <button className="btn-secondary w-full" onClick={add}>
+          <Icon name="plus" size={16} /> Aggiungi ingrediente
+        </button>
+        {candidates.length > 0 && (
+          <label className="btn-secondary relative w-full cursor-pointer">
+            <Icon name="book" size={16} /> Aggiungi una base
+            <select
+              className="absolute inset-0 cursor-pointer opacity-0"
+              aria-label="Aggiungi una base: scegli una ricetta"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) addBase(e.target.value)
+                e.target.value = ''
+              }}
+            >
+              <option value="">Scegli una ricetta…</option>
+              {candidates.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.title}
+                  {r.yield ? ` (resa ${r.yield.amount} ${r.yield.unit})` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
     </section>
   )
 }
@@ -615,10 +680,13 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
   )
 }
 
-function PhaseReview({ recipe }: { recipe: Recipe }) {
+function PhaseReview({ recipe, recipes }: { recipe: Recipe; recipes: Recipe[] }) {
   const scaled = useMemo(() => scaleRecipe(recipe, 1), [recipe])
   const doubled = useMemo(() => scaleRecipe(recipe, 2), [recipe])
-  const problems = useMemo(() => checkRecipe(recipe), [recipe])
+  const problems = useMemo(() => {
+    const byId = new Map(recipes.map((r) => [r.id, r]))
+    return checkRecipe(recipe, (rid) => byId.get(rid))
+  }, [recipe, recipes])
   return (
     <section className="space-y-3">
       {problems.length > 0 && (

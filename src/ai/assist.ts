@@ -17,6 +17,11 @@ export interface ChatTurn {
   costUsd?: number
 }
 
+function basesForPrompt(bases: Recipe[] | undefined): string {
+  if (!bases?.length) return ''
+  return '\n\nBasi: ricette a parte usate da questa (quantità nella ricetta madre, dosi e passaggi qui sotto):\n' + bases.map((b) => recipeForPrompt(b)).join('\n')
+}
+
 function sessionsForPrompt(sessions: CookSession[]): string {
   const done = sessions.filter((s) => s.rating || s.notes)
   if (done.length === 0) return ''
@@ -33,7 +38,7 @@ function sessionsForPrompt(sessions: CookSession[]): string {
  * precedenti della stessa conversazione; `factor` il fattore di scalatura attuale.
  */
 export async function askAboutRecipe(
-  params: { recipe: Recipe; factor: number; sessions: CookSession[]; history: ChatTurn[]; question: string; stepContext?: string },
+  params: { recipe: Recipe; factor: number; sessions: CookSession[]; history: ChatTurn[]; question: string; stepContext?: string; bases?: Recipe[] },
   onDelta: (text: string) => void,
 ): Promise<{ text: string; costUsd: number }> {
   const inKitchen = Boolean(params.stepContext)
@@ -41,7 +46,7 @@ export async function askAboutRecipe(
   const model = inKitchen && settings.fastKitchenAnswers ? KITCHEN_MODEL : settings.model
   // Il contesto stabile (ricetta e diario) sta in un blocco di sistema con cache: dalla seconda
   // domanda si paga un decimo. Ciò che cambia (fattore, passaggio, domanda) va nel messaggio.
-  const stable = `Ricetta (JSON):\n${recipeForPrompt(params.recipe)}${sessionsForPrompt(params.sessions)}`
+  const stable = `Ricetta (JSON):\n${recipeForPrompt(params.recipe)}${basesForPrompt(params.bases)}${sessionsForPrompt(params.sessions)}`
   const volatile = [
     `Fattore di scalatura attuale: ×${params.factor}.`,
     params.stepContext ? `L'utente sta cucinando adesso ed è a questo passaggio: ${params.stepContext}` : '',
@@ -77,7 +82,7 @@ export async function askAboutRecipe(
 }
 
 /** Produce una variante completa della ricetta seguendo un'istruzione. */
-export async function proposeVariant(params: { recipe: Recipe; sessions: CookSession[]; instruction: string }): Promise<ConversionResult & { costUsd: number }> {
+export async function proposeVariant(params: { recipe: Recipe; sessions: CookSession[]; instruction: string; bases?: Recipe[] }): Promise<ConversionResult & { costUsd: number }> {
   const { client, settings } = await getClient('variante')
   const response = await client.messages.parse({
     model: settings.model,
@@ -86,7 +91,7 @@ export async function proposeVariant(params: { recipe: Recipe; sessions: CookSes
     messages: [
       {
         role: 'user',
-        content: `Ricetta attuale (JSON):\n${recipeForPrompt(params.recipe)}${sessionsForPrompt(params.sessions)}\n\nIstruzione: ${params.instruction}`,
+        content: `Ricetta attuale (JSON):\n${recipeForPrompt(params.recipe)}${basesForPrompt(params.bases)}${sessionsForPrompt(params.sessions)}\n\nIstruzione: ${params.instruction}`,
       },
     ],
     output_config: { format: zodOutputFormat(aiRecipeSchema), effort: 'medium' },

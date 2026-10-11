@@ -13,6 +13,7 @@ interface Recipe {
   yield?: { amount: number; unit: string }   // resa totale di riferimento (es. 850 g)
   pan?: { shape: 'round'; diameterCm: number } | { shape: 'rect'; widthCm: number; lengthCm: number }  // teglia di riferimento
   favorite?: boolean          // stella
+  label?: LabelInfo           // dati dell'etichetta: allergeni confermati, peso netto, durata, conservazione, produttore
   tags: string[]
   sections?: string[]         // es. ["Crema", "Montaggio"]
   ingredients: Ingredient[]
@@ -35,6 +36,7 @@ interface Ingredient {
   scaling?: ScalingRule       // default: linear
   section?: string
   optional?: boolean
+  recipeId?: string           // se presente l'ingrediente è un'altra ricetta (una base)
 }
 ```
 
@@ -99,6 +101,19 @@ interface Step {
 I timer avviati (da lettura o da modalità cucina) vivono in un unico store persistito in `localStorage` (`src/app/timers/store.tsx`), identificati da `ricetta:passaggio`. Una barra sempre visibile li mostra tutti; toccandone uno in modalità cucina si salta al passaggio. Il conto alla rovescia usa un timestamp di fine, quindi regge a ricaricamenti e sospensioni del tab.
 
 `renderStep` in `steps.ts` sostituisce i riferimenti con la quantità già scalata ("350 g di acqua"), così lettura e modalità cucina mostrano sempre i numeri giusti.
+
+## Ricette composte
+
+Un ingrediente con `recipeId` è una **base**: un'altra ricetta che entra in questa. La quantità dice quanta prepararne, in due modi (`compose.ts`):
+
+- **a peso o volume** ("300 g di frolla"): il fattore della base è quantità / resa della base, quindi serve `yield` in grammi o millilitri;
+- **a dosi** (senza unità, "1 dose di crema"): il fattore è il numero di dosi.
+
+`resolveBases` dà le basi dirette con il loro fattore (o il motivo per cui non si ricava); `flattenIngredients` apre le basi fino a tre livelli, senza cicli, e dà agli ingredienti interni la base come sezione: lo usano la spesa e l'etichetta. `wouldCycle` impedisce di scegliere come base una ricetta che contiene già la madre. Cancellando una base, le ricette che la usavano la tengono come ingrediente semplice (`detachBase`). `splitRecipe` fa l'operazione inversa ("scomponi"): stacca ingredienti e passaggi in una nuova ricetta e lascia nella madre una riga "1 dose di …" collegata, riscrivendo i riferimenti nei passaggi rimasti. L'assistente riceve le basi insieme alla ricetta.
+
+## Etichetta
+
+`labelItems` (`label.ts`) elenca gli ingredienti in ordine decrescente di peso stimato (grammi e millilitri diretti, uova 55 g, cucchiai 12 g…), con le basi tra parentesi e i loro componenti; `detectAllergens` riconosce i 14 allergeni dell'allegato II del regolamento 1169/2011 dalle parole dei nomi (con esclusioni per i falsi amici: noce moscata, latte di cocco, farina di riso). Gli allergeni confermati a mano stanno in `Recipe.label.allergens`; il logo è nelle impostazioni del dispositivo. La stampa usa il formato scelto come dimensione di pagina, oppure un foglio A4 con più copie.
 
 ## Lista della spesa
 

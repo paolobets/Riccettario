@@ -28,6 +28,8 @@
 - Controllo della ricetta nel riepilogo del wizard (`src/core/lint.ts`, testato): uova lineari, passaggi lunghi senza timer, riposi senza nulla in parallelo, ingredienti mai citati, passaggi vuoti o paralleli a nulla, base del panettiere mancante. Consigli, non blocchi.
 - Preferiti: stella nella ricetta, filtro "preferite" in lista. I tag fanno da raccolte.
 - Stampa e condivisione: foglio di stile di stampa (solo la ricetta, senza comandi), "Condividi" manda testo con le dosi riscalate e un link che contiene la ricetta (`/condivisa#r=…`): chi lo apre la vede e la salva come copia propria, anche senza account.
+- Ricette composte: un ingrediente può essere un'altra ricetta (a peso sulla resa, o a dosi), `src/core/compose.ts` testato; sezione "Basi" nella ricetta con "Spiana le basi", "Basi da preparare" in cucina, spesa ed etichetta che aprono le basi, "Aggiungi una base" nel wizard senza giri, cancellazione che stacca. "Componi da basi" (`/componi`) e "Scomponi" (`/ricetta/:id/scomponi`, per sezione o a mano). L'assistente e le varianti vedono le basi.
+- Etichetta da stampare (`/ricetta/:id/etichetta`): ingredienti in ordine di peso con le basi tra parentesi, 14 allergeni riconosciuti dai nomi e confermabili, "Contiene" e "Può contenere tracce", peso netto, data di produzione e scadenza, conservazione, produttore, logo (sul dispositivo), formati 70×50, 100×70, A6 o foglio A4 con più copie; PDF dalla stampa del browser.
 - Riduzione dei costi AI: cache del prompt sul contesto delle conversazioni (1 h in cucina), sforzo di ragionamento per funzione (basso per domande e suggerimenti, medio per import e varianti), Haiku 5.5 per le domande in cucina (opzione), import da sito tramite JSON-LD con rotta `GET /fetch` nel proxy e lettura via AI solo come ripiego; prezzi di cache nel conteggio dei costi.
 
 ## Prossimi passi
@@ -37,13 +39,16 @@ Le otto funzionalità concordate il 10 ottobre 2026 sono fatte (vedi sopra). Res
 ### 1. Foto del risultato
 A fine cottura una foto che resta nel diario e in lista. Serve uno spazio per i file (R2 su Cloudflare) e la sincronizzazione delle immagini: sforzo medio.
 
-### 2. Raccolte
+### 2. Chat sul ricettario
+Una conversazione libera che vede l'indice delle ricette e apre quelle pertinenti: "una crostata con le mie basi", "ho lievito madre in eccesso"; con "Trasformala in ricetta" che porta nel wizard. Si appoggia su ricette composte e import strutturato. Sforzo medio.
+
+### 3. Raccolte
 Oltre ai tag, raccolte con un ordine proprio ("Natale", "Settimana prossima") e una pagina per ciascuna. Sforzo piccolo, dati nuovi da sincronizzare.
 
-### 3. Lista della spesa sincronizzata
+### 4. Lista della spesa sincronizzata
 Oggi la lista vive sul dispositivo: portarla sul server come quarta tabella, così la si prepara al computer e la si legge al supermercato dal telefono. Sforzo piccolo (stessa logica di `sync`).
 
-### 4. Notifiche anche ad app chiusa
+### 5. Notifiche anche ad app chiusa
 "Pronto per le 20:00" avvisa finché l'app è aperta. Con le notifiche push del service worker avviserebbe anche da chiusa: serve una chiave VAPID e una rotta sul server. Sforzo medio.
 
 ### Già in programma

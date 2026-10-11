@@ -10,7 +10,9 @@ App ricettario personale, installabile come PWA e funzionante offline, con tre i
 
 5. **Cosa preparo?**: scegli il pasto, il tempo che hai ai fornelli e cosa c'è in casa; l'app pesca tra le tue ricette (preferendo quelle che usano quello che hai e che non cucini da un po') e, se vuoi, chiede all'AI una seconda opinione o un piatto nuovo.
 
-6. **Intorno alla ricetta**: lista della spesa che somma gli ingredienti di più ricette con le loro porzioni; "Pronto per le 20:00" che calcola a ritroso quando iniziare ogni passaggio; ripresa di una cottura interrotta; scalatura per teglia; preferiti, ordinamento e diario in lista; controllo della ricetta nel wizard; stampa e condivisione con un link che contiene la ricetta.
+6. **Ricette composte ed etichetta**: una base (frolla, crema, frangipane) è una ricetta a sé che entra in un'altra a peso o a dosi e si riscala con lei; si compone da basi esistenti o si scompone una ricetta in parti; l'etichetta da stampare elenca gli ingredienti in ordine di peso con gli allergeni evidenziati e il tuo logo.
+
+7. **Intorno alla ricetta**: lista della spesa che somma gli ingredienti di più ricette con le loro porzioni; "Pronto per le 20:00" che calcola a ritroso quando iniziare ogni passaggio; ripresa di una cottura interrotta; scalatura per teglia; preferiti, ordinamento e diario in lista; controllo della ricetta nel wizard; stampa e condivisione con un link che contiene la ricetta.
 
 ## Come provarla
 

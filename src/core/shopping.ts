@@ -5,6 +5,7 @@
 import type { Quantity, Recipe } from './model'
 import { formatQuantity } from './format'
 import { scaleRecipe } from './scaling'
+import { flattenIngredients, type RecipeLookup } from './compose'
 import { toBase, toDisplayUnit } from './units'
 
 export interface ShoppingEntry {
@@ -39,13 +40,13 @@ export function normalizeIngredientName(name: string): string {
     .trim()
 }
 
-export function buildShoppingList(entries: ShoppingEntry[]): ShoppingLine[] {
+export function buildShoppingList(entries: ShoppingEntry[], lookup?: RecipeLookup): ShoppingLine[] {
   const lines = new Map<string, ShoppingLine>()
   const pending: Array<{ name: string; norm: string; source: ShoppingSource; optional: boolean }> = []
 
   for (const { recipe, factor } of entries) {
-    const scaled = scaleRecipe(recipe, factor)
-    for (const ing of scaled.ingredients) {
+    const ingredients = lookup ? flattenIngredients(recipe, factor, lookup) : scaleRecipe(recipe, factor).ingredients
+    for (const ing of ingredients) {
       const norm = normalizeIngredientName(ing.name)
       if (!norm) continue
       const toTaste = ing.scaling?.mode === 'toTaste' || !ing.scaled || ing.scaled.unit === 'q.b.'

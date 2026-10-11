@@ -17,6 +17,9 @@ import ForgotPage from './pages/auth/ForgotPage'
 import ResetPage from './pages/auth/ResetPage'
 import ShoppingPage from './pages/ShoppingPage'
 import SharedPage from './pages/SharedPage'
+import ComposePage from './pages/ComposePage'
+import SplitPage from './pages/SplitPage'
+import LabelPage from './pages/LabelPage'
 
 export default function App() {
   const [ready, setReady] = useState(false)
@@ -36,6 +39,9 @@ export default function App() {
         <Route path="ricetta/nuova" element={<RecipeWizard />} />
         <Route path="ricetta/:id" element={<RecipeView />} />
         <Route path="ricetta/:id/modifica" element={<RecipeWizard />} />
+        <Route path="ricetta/:id/scomponi" element={<SplitPage />} />
+        <Route path="ricetta/:id/etichetta" element={<LabelPage />} />
+        <Route path="componi" element={<ComposePage />} />
         <Route path="impostazioni" element={<Settings />} />
         <Route path="importa" element={<ImportPage />} />
         <Route path="cosa-preparo" element={<SuggestPage />} />

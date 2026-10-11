@@ -36,6 +36,7 @@ const PATHS = {
   printer: 'M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z',
   clock: 'M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
   play: 'M6 4l14 8-14 8V4z',
+  tag: 'M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0l-7-7V4h9.6l7.4 7.4a2 2 0 0 1 0 2zM7.5 7.5h.01',
 } as const
 
 export type IconName = keyof typeof PATHS
