@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Recipe } from '@/core'
+import type { Recipe, Tombstone } from '@/core'
 
 /** Sessione di cottura: cosa è successo quando ho preparato la ricetta. */
 export interface CookSession {
@@ -30,6 +30,8 @@ class RicettarioDB extends Dexie {
   sessions!: EntityTable<CookSession, 'id'>
   settings!: EntityTable<Setting, 'key'>
   chats!: EntityTable<Chat, 'id'>
+  /** Cancellazioni da propagare agli altri dispositivi. */
+  tombstones!: Dexie.Table<Tombstone, [string, string]>
 
   constructor() {
     super('ricettario')
@@ -43,6 +45,13 @@ class RicettarioDB extends Dexie {
       sessions: 'id, recipeId, startedAt',
       settings: 'key',
       chats: 'id, recipeId, updatedAt',
+    })
+    this.version(3).stores({
+      recipes: 'id, title, updatedAt, *tags',
+      sessions: 'id, recipeId, startedAt',
+      settings: 'key',
+      chats: 'id, recipeId, updatedAt',
+      tombstones: '[table+id], deletedAt',
     })
   }
 }

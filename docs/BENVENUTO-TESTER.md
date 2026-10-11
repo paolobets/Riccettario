@@ -12,7 +12,7 @@ Ciao! Ti va di provare il mio ricettario? È un'app per il telefono che ridimens
 2. Su iPhone: tasto Condividi → "Aggiungi alla schermata Home". Su Android: menu ⋮ → "Installa app" o "Aggiungi a schermata Home".
 3. Apri l'app dall'icona, vai in **Impostazioni → Assistente AI** e incolla la tua password: `mela-bollito-ventaglio-72`. Salva.
 
-Le ricette restano sul tuo telefono, nessuno le vede. L'assistente usa un budget mensile che pago io: in Impostazioni vedi quanto ne hai usato. Se finisce, riparte il mese dopo.
+Le ricette sono tue: stanno sul telefono e in una copia sul server legata alla tua password, così se cambi telefono le ritrovi inserendo la password. L'assistente usa un budget mensile che pago io: in Impostazioni vedi quanto ne hai usato. Se finisce, riparte il mese dopo.
 
 **Cosa mi interessa sapere**
 
@@ -29,7 +29,7 @@ Grazie!
 
 ## Promemoria per chi gestisce
 
-- Password: tre o quattro parole a caso e un numero, diverse per persona, nel segreto `USERS` (vedi `docs/CLOUDFLARE.md`).
+- Utente nuovo: `curl -X POST -H "x-admin-token: …" -H "content-type: application/json" -d '{"name":"anna"}' https://ricettario.pages.dev/api/admin/users`; la password è nella risposta, una volta sola.
 - Consumi di tutti: `curl -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/usage`.
-- Budget predefinito 3 $ a persona al mese e 5 $ al giorno per tutti: con le riduzioni attive bastano per un uso normale; si alzano con `MONTHLY_BUDGET_USD` e `DAILY_BUDGET_USD`.
-- Per togliere una persona: via la sua riga da `USERS`, poi *Retry deployment*.
+- Budget predefinito 3 $ a persona al mese e 5 $ al giorno per tutti: con le riduzioni attive bastano per un uso normale; si alzano con `MONTHLY_BUDGET_USD` e `DAILY_BUDGET_USD`, o per persona con `"budgetUsd"` alla creazione.
+- Password persa: `…/api/admin/users/anna/reset`. Per sospendere: `…/disable`.

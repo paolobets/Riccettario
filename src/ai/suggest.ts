@@ -33,7 +33,7 @@ function recipesForPrompt(p: SuggestParams): string {
 
 /** Chiede all'AI cosa cucinare, scegliendo tra le ricette del ricettario o proponendo un piatto nuovo. */
 export async function suggestDish(p: SuggestParams): Promise<AiSuggestion & { costUsd: number }> {
-  const { client, settings } = await getClient()
+  const { client, settings } = await getClient('cosa-preparo')
   const content = `Pasto: ${p.meal}.\nTempo ai fornelli disponibile: ${p.maxActiveMinutes ? `${p.maxActiveMinutes} minuti` : 'nessun limite'}.\nIn casa ho: ${p.pantry.trim() || 'non specificato'}.\n\nRicette del ricettario:\n${recipesForPrompt(p) || '(nessuna)'}`
   const response = await client.messages.parse({
     model: settings.model,

@@ -39,7 +39,7 @@ export async function fileToImageBlock(file: File): Promise<Anthropic.ImageBlock
  * potrebbe scaricarlo per via del CORS).
  */
 export async function importRecipe(input: ImportInput, onStatus?: (s: string) => void): Promise<ConversionResult & { costUsd: number }> {
-  const { client, settings } = await getClient()
+  const { client, settings } = await getClient(input.dish?.trim() ? 'piatto' : input.url?.trim() ? 'sito' : input.images?.length ? 'foto' : 'testo')
   const content: Anthropic.ContentBlockParam[] = []
   if (input.images?.length) {
     onStatus?.('Preparo le immagini…')

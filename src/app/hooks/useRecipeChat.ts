@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { db, type Chat } from '@/data/db'
+import { deleteChat, saveChat } from '@/data/repo'
 import { newId, type Recipe } from '@/core'
 import type { ChatTurn } from '@/ai/assist'
 
@@ -50,7 +51,7 @@ export function useRecipeChat(recipe: Recipe, factor: number) {
           turns: [...chat.turns, { role: 'user', text: question }, { role: 'assistant', text, costUsd }],
           updatedAt: new Date().toISOString(),
         }
-        await db.chats.put(next)
+        await saveChat(next)
         setChat(next)
       } catch (e) {
         const { describeAiError } = await import('@/ai/client')
@@ -64,7 +65,7 @@ export function useRecipeChat(recipe: Recipe, factor: number) {
   )
 
   const reset = useCallback(async () => {
-    if (chat && chat.turns.length > 0) await db.chats.delete(chat.id)
+    if (chat && chat.turns.length > 0) await deleteChat(chat.id)
     setChat({ id: newId('c'), recipeId: recipe.id, turns: [], updatedAt: new Date().toISOString() })
     setError(null)
   }, [chat, recipe.id])

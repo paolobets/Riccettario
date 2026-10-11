@@ -1,5 +1,7 @@
 /**
- * Proxy verso l'API di Anthropic con password personali e misura dei costi per utente.
+ * Backend del Ricettario: proxy verso l'API di Anthropic, utenti con password
+ * personale, budget, misura dei consumi per richiesta e sincronizzazione
+ * dell'archivio tra dispositivi. Dati su D1 (binding `DB`).
  *
  * Usato in due modi, con lo stesso codice:
  * - come funzione di Cloudflare Pages su /api (functions/api/[[path]].js), insieme all'app;
@@ -7,22 +9,30 @@
  *
  * Variabili e segreti:
  *   ANTHROPIC_API_KEY   la chiave vera (segreto)
- *   USERS               JSON {"nome": "password", ...}: una password per persona (segreto)
+ *   ADMIN_TOKEN         password dell'amministratore per le rotte /admin (segreto)
+ *   USERS               facoltativo, JSON {"nome": "password"}: utenti creati in D1 alla prima
+ *                       richiesta con quella password; senza D1 è l'unico elenco utenti (segreto)
  *   PROXY_TOKEN         compatibilità: una sola password, utente "default" (segreto, facoltativo)
- *   ADMIN_TOKEN         password per GET /admin/usage (segreto)
- *   MONTHLY_BUDGET_USD  budget per utente al mese, default 3
+ *   MONTHLY_BUDGET_USD  budget per utente al mese se l'utente non ne ha uno proprio, default 3
  *   DAILY_BUDGET_USD    tetto giornaliero per tutti gli utenti insieme, default 5
  *   ALLOWED_ORIGIN      origine ammessa per il CORS, default *
- * Binding KV:
- *   USAGE               dove si sommano i consumi (senza, la misura è disattivata)
+ * Binding:
+ *   DB                  database D1. Senza, funzionano solo proxy e /fetch: niente budget,
+ *                       misura né sincronizzazione.
  *
  * Rotte (relative al prefisso, "/api" su Pages, "" sul worker):
- *   GET  /health                stato
- *   GET  /me                    consumo del mese di chi chiama e budget
- *   GET  /fetch?url=            sorgente HTML di una pagina di ricetta (per l'import JSON-LD)
- *   GET  /admin/usage?month=    consumi di tutti gli utenti (x-admin-token)
- *   POST /v1/messages           inoltro ad Anthropic con controllo del budget e misura
+ *   GET  /health                   stato
+ *   GET  /me                       chi sono, piano, budget, consumo del mese, righe sincronizzate
+ *   GET  /fetch?url=               sorgente HTML di una pagina di ricetta (per l'import JSON-LD)
+ *   POST /sync                     {since, recipes, sessions, chats} → {now, recipes, sessions, chats}
+ *   POST /v1/messages              inoltro ad Anthropic con controllo del budget e misura
+ *   GET  /admin/usage?month=       consumi del mese per utente e totale di oggi (x-admin-token)
+ *   GET  /admin/users              elenco utenti
+ *   POST /admin/users              {name, plan?, budgetUsd?, password?} → utente creato con la password
+ *   POST /admin/users/:name/reset  nuova password
+ *   POST /admin/users/:name/disable | /enable
  */
+import { counts, createUser, dayUsage, ensureSchema, findUserByName, findUserByToken, listUsers, logUsage, monthUsage, monthUsageByUser, resetPassword, setDisabled, sync, touchUser } from './db.js'
 
 /** Prezzi in USD per milione di token, come in src/ai/usage.ts. */
 const PRICES = {
@@ -31,8 +41,7 @@ const PRICES = {
   'claude-haiku-5-5': { input: 0.1, output: 0.5, cacheRead: 0.01 },
 }
 const MAX_PAGE_BYTES = 2_000_000
-const MONTH_TTL = 400 * 86400
-const DAY_TTL = 7 * 86400
+const MAX_SYNC_BYTES = 8_000_000
 
 export function costOf(model, usage) {
   const p = PRICES[model] ?? PRICES['claude-opus-5-5']
@@ -46,7 +55,7 @@ function cors(env) {
   return {
     'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN ?? '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'content-type, x-api-key, x-admin-token, anthropic-version, anthropic-beta, anthropic-dangerous-direct-browser-access',
+    'Access-Control-Allow-Headers': 'content-type, x-api-key, x-admin-token, x-ricettario-feature, anthropic-version, anthropic-beta, anthropic-dangerous-direct-browser-access',
   }
 }
 
@@ -59,13 +68,13 @@ function apiError(status, type, message, headers) {
   return json({ type: 'error', error: { type, message } }, status, headers)
 }
 
-function users(env) {
+function envUsers(env) {
   const map = {}
   if (env.USERS) {
     try {
       Object.assign(map, JSON.parse(env.USERS))
     } catch {
-      // USERS non è JSON valido: nessun utente oltre a default
+      // USERS non è JSON valido
     }
   }
   if (env.PROXY_TOKEN) map.default = env.PROXY_TOKEN
@@ -79,41 +88,40 @@ function sameSecret(a, b) {
   return diff === 0
 }
 
-function authenticate(request, env) {
+function envUserFor(env, token) {
+  for (const [name, pw] of Object.entries(envUsers(env))) if (sameSecret(pw, token)) return name
+  return null
+}
+
+/**
+ * Riconosce chi chiama dalla password. Con D1 cerca in tabella; se la password è
+ * nel segreto USERS e l'utente non esiste ancora, lo crea (così i primi utenti
+ * si caricano senza comandi). Senza D1 vale solo il segreto USERS.
+ */
+async function authenticate(request, env) {
   const token = request.headers.get('x-api-key')
   if (!token) return null
-  for (const [name, pw] of Object.entries(users(env))) if (sameSecret(pw, token)) return name
-  return null
+  if (env.DB) {
+    await ensureSchema(env.DB)
+    const found = await findUserByToken(env.DB, token)
+    if (found) return { id: found.id, name: found.name, plan: found.plan, budgetUsd: found.budget_usd }
+    const name = envUserFor(env, token)
+    if (!name) return null
+    const existing = await findUserByName(env.DB, name)
+    if (existing) return null // utente già in tabella con un'altra password: vince la tabella
+    const created = await createUser(env.DB, { name, password: token })
+    return { id: created.id, name, plan: created.plan, budgetUsd: null }
+  }
+  const name = envUserFor(env, token)
+  return name ? { id: name, name, plan: 'tester', budgetUsd: null } : null
+}
+
+function isAdmin(request, env) {
+  return Boolean(env.ADMIN_TOKEN) && sameSecret(request.headers.get('x-admin-token') ?? '', env.ADMIN_TOKEN)
 }
 
 const monthKey = (d = new Date()) => d.toISOString().slice(0, 7)
 const dayKey = (d = new Date()) => d.toISOString().slice(0, 10)
-const empty = () => ({ costUsd: 0, requests: 0, inputTokens: 0, outputTokens: 0 })
-
-async function readUsage(env, key) {
-  if (!env.USAGE) return null
-  return (await env.USAGE.get(key, 'json')) ?? empty()
-}
-
-async function addUsage(env, key, delta, ttl) {
-  if (!env.USAGE) return
-  const cur = (await env.USAGE.get(key, 'json')) ?? empty()
-  cur.costUsd += delta.costUsd
-  cur.requests += 1
-  cur.inputTokens += delta.inputTokens
-  cur.outputTokens += delta.outputTokens
-  cur.updatedAt = new Date().toISOString()
-  await env.USAGE.put(key, JSON.stringify(cur), { expirationTtl: ttl })
-}
-
-async function record(env, user, model, usage) {
-  const delta = {
-    costUsd: costOf(model, usage),
-    inputTokens: (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
-    outputTokens: usage.output_tokens ?? 0,
-  }
-  await Promise.all([addUsage(env, `u:${user}:${monthKey()}`, delta, MONTH_TTL), addUsage(env, `g:${dayKey()}`, delta, DAY_TTL)])
-}
 
 /** Legge gli eventi SSE di una risposta in streaming e ne ricava l'uso complessivo. */
 async function usageFromStream(stream) {
@@ -151,9 +159,54 @@ async function fetchPage(target, env) {
   return new Response(html, { status: 200, headers: { ...cors(env), 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
 }
 
+async function readJson(request, maxBytes) {
+  const text = await request.text()
+  if (text.length > maxBytes) throw new Error('troppo grande')
+  return JSON.parse(text)
+}
+
+async function adminRoutes(request, env, path, headers) {
+  if (!isAdmin(request, env)) return apiError(401, 'authentication_error', 'Password amministratore non valida', headers)
+  if (!env.DB) return json({ error: 'Binding D1 "DB" assente: utenti e consumi non disponibili' }, 503, headers)
+  await ensureSchema(env.DB)
+  const url = new URL(request.url)
+
+  if (request.method === 'GET' && path === '/admin/usage') {
+    const month = url.searchParams.get('month') ?? monthKey()
+    return json({ month, defaultBudgetUsd: Number(env.MONTHLY_BUDGET_USD ?? 3), users: await monthUsageByUser(env.DB, month), today: await dayUsage(env.DB, dayKey()) }, 200, headers)
+  }
+  if (request.method === 'GET' && path === '/admin/users') return json({ users: await listUsers(env.DB) }, 200, headers)
+  if (request.method === 'POST' && path === '/admin/users') {
+    let body
+    try {
+      body = await readJson(request, 10_000)
+    } catch {
+      return apiError(400, 'invalid_request_error', 'Corpo non valido', headers)
+    }
+    const name = String(body?.name ?? '')
+      .trim()
+      .toLowerCase()
+    if (!/^[a-z0-9][a-z0-9._-]{1,30}$/.test(name)) return apiError(400, 'invalid_request_error', 'Nome non valido: lettere minuscole, cifre, punto, trattino, da 2 a 31 caratteri', headers)
+    if (await findUserByName(env.DB, name)) return apiError(409, 'invalid_request_error', `L'utente ${name} esiste già`, headers)
+    const user = await createUser(env.DB, { name, password: body?.password || undefined, plan: body?.plan || 'tester', budgetUsd: body?.budgetUsd ?? null })
+    return json({ ...user, note: 'Conserva la password: non viene mostrata di nuovo.' }, 201, headers)
+  }
+  const m = path.match(/^\/admin\/users\/([a-z0-9._-]+)\/(reset|disable|enable)$/)
+  if (request.method === 'POST' && m) {
+    const [, name, action] = m
+    if (action === 'reset') {
+      const password = await resetPassword(env.DB, name)
+      return password ? json({ name, password }, 200, headers) : apiError(404, 'not_found_error', 'Utente non trovato', headers)
+    }
+    const ok = await setDisabled(env.DB, name, action === 'disable')
+    return ok ? json({ name, disabled: action === 'disable' }, 200, headers) : apiError(404, 'not_found_error', 'Utente non trovato', headers)
+  }
+  return apiError(404, 'not_found_error', 'Rotta non trovata', headers)
+}
+
 /**
  * Gestisce una richiesta. `prefix` è la parte di percorso da togliere ("/api" su Pages),
- * `waitUntil` permette di scrivere i consumi dopo aver già risposto.
+ * `waitUntil` permette di registrare i consumi dopo aver già risposto.
  */
 export async function handleProxy(request, env, { prefix = '', waitUntil = (p) => p } = {}) {
   const headers = cors(env)
@@ -162,47 +215,46 @@ export async function handleProxy(request, env, { prefix = '', waitUntil = (p) =
   const path = url.pathname.startsWith(prefix) ? url.pathname.slice(prefix.length) || '/' : url.pathname
 
   if (request.method === 'GET' && path === '/health') {
-    return json({ ok: true, users: Object.keys(users(env)).length, metering: Boolean(env.USAGE), key: Boolean(env.ANTHROPIC_API_KEY) }, 200, headers)
+    return json({ ok: true, database: Boolean(env.DB), key: Boolean(env.ANTHROPIC_API_KEY), admin: Boolean(env.ADMIN_TOKEN), envUsers: Object.keys(envUsers(env)).length }, 200, headers)
   }
+  if (path.startsWith('/admin/')) return adminRoutes(request, env, path, headers)
 
-  if (request.method === 'GET' && path === '/admin/usage') {
-    if (!env.ADMIN_TOKEN || !sameSecret(request.headers.get('x-admin-token') ?? '', env.ADMIN_TOKEN)) return apiError(401, 'authentication_error', 'Password amministratore non valida', headers)
-    if (!env.USAGE) return json({ month: monthKey(), users: [], note: 'Binding KV USAGE assente: misura disattivata' }, 200, headers)
-    const month = url.searchParams.get('month') ?? monthKey()
-    const list = await env.USAGE.list({ prefix: 'u:' })
-    const rows = []
-    for (const k of list.keys) {
-      const [, name, m] = k.name.split(':')
-      if (m !== month) continue
-      rows.push({ user: name, ...(await env.USAGE.get(k.name, 'json')) })
-    }
-    rows.sort((a, b) => b.costUsd - a.costUsd)
-    const today = await readUsage(env, `g:${dayKey()}`)
-    return json({ month, budgetUsd: Number(env.MONTHLY_BUDGET_USD ?? 3), users: rows, today }, 200, headers)
-  }
-
-  const user = authenticate(request, env)
+  const user = await authenticate(request, env)
   if (!user) return apiError(401, 'authentication_error', 'Password non valida: controlla quella inserita in Impostazioni.', headers)
+  const budgetUsd = user.budgetUsd ?? Number(env.MONTHLY_BUDGET_USD ?? 3)
 
   if (request.method === 'GET' && path === '/me') {
-    const usage = await readUsage(env, `u:${user}:${monthKey()}`)
-    return json({ user, month: monthKey(), budgetUsd: Number(env.MONTHLY_BUDGET_USD ?? 3), usage }, 200, headers)
+    const usage = env.DB ? await monthUsage(env.DB, user.id, monthKey()) : null
+    const stored = env.DB ? await counts(env.DB, user.id) : null
+    return json({ user: user.name, plan: user.plan, month: monthKey(), budgetUsd, usage, stored, sync: Boolean(env.DB) }, 200, headers)
   }
 
   if (request.method === 'GET' && path === '/fetch') return fetchPage(url.searchParams.get('url'), env)
 
+  if (request.method === 'POST' && path === '/sync') {
+    if (!env.DB) return apiError(503, 'api_error', 'Sincronizzazione non disponibile su questo server.', headers)
+    let body
+    try {
+      body = await readJson(request, MAX_SYNC_BYTES)
+    } catch {
+      return apiError(400, 'invalid_request_error', 'Dati di sincronizzazione non validi o troppo grandi.', headers)
+    }
+    const result = await sync(env.DB, user.id, body ?? {})
+    waitUntil(touchUser(env.DB, user.id))
+    return json(result, 200, headers)
+  }
+
   if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers })
-  if (!env.ANTHROPIC_API_KEY) return apiError(500, 'api_error', 'Chiave Anthropic non configurata sul proxy.', headers)
+  if (!env.ANTHROPIC_API_KEY) return apiError(500, 'api_error', 'Chiave Anthropic non configurata sul server.', headers)
 
   // Controllo del budget prima di spendere.
-  const monthly = Number(env.MONTHLY_BUDGET_USD ?? 3)
-  const daily = Number(env.DAILY_BUDGET_USD ?? 5)
-  const [mine, today] = await Promise.all([readUsage(env, `u:${user}:${monthKey()}`), readUsage(env, `g:${dayKey()}`)])
-  if (mine && mine.costUsd >= monthly) {
-    return apiError(429, 'budget_exceeded', `Hai usato il budget di questo mese (${monthly.toFixed(2).replace('.', ',')} $). L'assistente riparte il primo del mese prossimo.`, headers)
-  }
-  if (today && today.costUsd >= daily) {
-    return apiError(429, 'budget_exceeded', "L'app ha raggiunto il limite di spesa di oggi per tutti. Riprova domani.", headers)
+  if (env.DB) {
+    const daily = Number(env.DAILY_BUDGET_USD ?? 5)
+    const [mine, today] = await Promise.all([monthUsage(env.DB, user.id, monthKey()), dayUsage(env.DB, dayKey())])
+    if (mine.costUsd >= budgetUsd) {
+      return apiError(429, 'budget_exceeded', `Hai usato il budget di questo mese (${budgetUsd.toFixed(2).replace('.', ',')} $). L'assistente riparte il primo del mese prossimo.`, headers)
+    }
+    if (today.costUsd >= daily) return apiError(429, 'budget_exceeded', "L'app ha raggiunto il limite di spesa di oggi per tutti. Riprova domani.", headers)
   }
 
   const body = await request.text()
@@ -214,6 +266,7 @@ export async function handleProxy(request, env, { prefix = '', waitUntil = (p) =
   }
   const model = parsed?.model
   if (!PRICES[model]) return apiError(400, 'invalid_request_error', `Modello non ammesso: ${model}`, headers)
+  const feature = (request.headers.get('x-ricettario-feature') ?? '').slice(0, 40) || null
 
   const upstream = await fetch(`https://api.anthropic.com${path}${url.search}`, {
     method: 'POST',
@@ -227,20 +280,24 @@ export async function handleProxy(request, env, { prefix = '', waitUntil = (p) =
   })
   const outHeaders = new Headers(upstream.headers)
   for (const [k, v] of Object.entries(headers)) outHeaders.set(k, v)
-  outHeaders.set('x-ricettario-user', user)
+  outHeaders.set('x-ricettario-user', user.name)
 
   if (!upstream.ok || !upstream.body) return new Response(upstream.body, { status: upstream.status, headers: outHeaders })
 
+  const record = async (usage) => {
+    if (!env.DB || !usage) return
+    await logUsage(env.DB, { userId: user.id, feature, model, usage, costUsd: costOf(model, usage) })
+    await touchUser(env.DB, user.id)
+  }
   const type = upstream.headers.get('content-type') ?? ''
   if (type.includes('text/event-stream')) {
     const [toClient, toMeter] = upstream.body.tee()
-    waitUntil(usageFromStream(toMeter).then((usage) => record(env, user, model, usage)))
+    waitUntil(usageFromStream(toMeter).then(record))
     return new Response(toClient, { status: upstream.status, headers: outHeaders })
   }
   const text = await upstream.text()
   try {
-    const usage = JSON.parse(text).usage
-    if (usage) waitUntil(record(env, user, model, usage))
+    waitUntil(record(JSON.parse(text).usage))
   } catch {
     // risposta non JSON: niente da misurare
   }

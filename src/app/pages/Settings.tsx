@@ -3,6 +3,7 @@ import { exportAll, importJson } from '@/data/repo'
 import { DEFAULT_MODEL, HOSTED, loadAiSettings, MODELS, saveAiSettings, type AiSettings } from '@/ai/settings'
 import { formatUsd, loadUsage, resetUsage, type UsageTotals } from '@/ai/usage'
 import { fetchAccount, type Account } from '@/ai/account'
+import { syncNow, useSyncStatus } from '@/data/sync'
 import { loadTheme, saveTheme, type Theme } from '../theme'
 import Icon from '../components/Icon'
 
@@ -15,6 +16,7 @@ export default function Settings() {
   const [usage, setUsage] = useState<UsageTotals | null>(null)
   const [theme, setTheme] = useState<Theme>(() => loadTheme())
   const [account, setAccount] = useState<Account | null>(null)
+  const sync = useSyncStatus()
   useEffect(() => {
     loadAiSettings().then((s) => {
       setAi(s)
@@ -139,6 +141,7 @@ export default function Settings() {
               await saveAiSettings(ai)
               setAiSaved(true)
               setAccount(await fetchAccount(ai))
+              void syncNow()
             }}
           >
             Salva
@@ -184,10 +187,43 @@ export default function Settings() {
           </div>
         )}
       </section>
+      {account?.sync && (
+        <section className="rule space-y-3 pt-4">
+          <h2 className="section-title text-lg">Sincronizzazione</h2>
+          <p className="text-sm text-muted">
+            Ricette, diario e conversazioni vengono copiati sul server sotto la tua password e ritrovati su ogni dispositivo in cui la inserisci. Se la stessa
+            ricetta è stata modificata su due dispositivi, vince la modifica più recente.
+          </p>
+          <p className="text-sm text-fg-2" role="status">
+            {sync.state === 'syncing'
+              ? 'Sincronizzo…'
+              : sync.state === 'error'
+                ? `Non riuscita: ${sync.error}`
+                : sync.lastSyncAt
+                  ? `Ultima sincronizzazione ${new Date(sync.lastSyncAt).toLocaleString('it-IT', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}${sync.pushed || sync.pulled ? `, ${sync.pushed} inviate e ${sync.pulled} ricevute` : ''}.`
+                  : 'Non ancora sincronizzato su questo dispositivo.'}
+          </p>
+          {account.stored && (
+            <p className="text-xs text-muted">
+              Sul server: {account.stored.recipes} ricette, {account.stored.sessions} cotture, {account.stored.chats} conversazioni.
+            </p>
+          )}
+          <button
+            className="btn-secondary"
+            disabled={sync.state === 'syncing'}
+            onClick={async () => {
+              await syncNow()
+              setAccount(await fetchAccount(ai))
+            }}
+          >
+            Sincronizza ora
+          </button>
+        </section>
+      )}
       <section className="rule space-y-3 pt-4">
         <h2 className="section-title text-lg">Backup</h2>
         <p className="text-sm text-muted">
-          Le ricette vivono solo su questo dispositivo. Esporta un file JSON per conservarle o portarle altrove.
+          {account?.sync ? 'Oltre alla sincronizzazione, puoi tenere una copia su file.' : 'Le ricette vivono solo su questo dispositivo. Esporta un file JSON per conservarle o portarle altrove.'}
         </p>
         <div className="flex flex-wrap gap-2">
           <button className="btn-primary" onClick={download}>

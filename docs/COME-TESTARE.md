@@ -26,6 +26,11 @@ Le ricette vivono nel browser del dispositivo: telefono e computer hanno archivi
 - [ ] "Esci" chiede conferma; "Resta in cucina" non perde nulla.
 - [ ] Arriva in fondo, dai un voto e una nota, salva: compaiono nel "Diario di cottura" della ricetta. Una cottura abbandonata con "Esci" non compare.
 
+### 2b. Sincronizzazione (su pages.dev, con la password)
+- [ ] Inserisci la password in *Impostazioni*: compare la sezione "Sincronizzazione" con l'ultima ora e il numero di ricette sul server.
+- [ ] Scrivi una nota su una ricetta; dopo qualche secondo "Sincronizza ora" riporta "1 inviata". Da un secondo dispositivo o da un altro browser, inserisci la stessa password: le ricette e la nota compaiono.
+- [ ] Cancella una ricetta su un dispositivo: sull'altro sparisce alla prossima apertura.
+
 ### 3. Cosa preparo? (nessuna chiave)
 - [ ] Dalla lista, "Cosa preparo oggi?". Scegli "45 minuti" e scrivi "uova, pecorino": la proposta è la carbonara con "Hai già pecorino". "Un'altra" scorre le alternative.
 - [ ] Scegli "20 minuti": nessuna ricetta sta nel tempo; "Togli il limite di tempo" e "Fatti scrivere una ricetta" (porta a Importa → Piatto).

@@ -11,6 +11,8 @@ import './index.css'
 registerSW({ immediate: true })
 document.title = APP_NAME
 initTheme()
+// Chiede al browser di non svuotare lo spazio dell'app quando libera memoria (iOS lo fa dopo settimane di inattività).
+navigator.storage?.persist?.().catch(() => undefined)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

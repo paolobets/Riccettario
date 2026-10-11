@@ -13,7 +13,7 @@ export class AiNotConfiguredError extends Error {
  * viene usata lato client: è accettabile per un'app personale dove la chiave è
  * dell'utente stesso. Con un proxy la chiave non lascia mai il server.
  */
-export function makeClient(s: AiSettings): Anthropic {
+export function makeClient(s: AiSettings, feature?: string): Anthropic {
   if (!isAiConfigured(s)) throw new AiNotConfiguredError()
   const proxy = s.proxyUrl.trim()
   return new Anthropic({
@@ -21,12 +21,14 @@ export function makeClient(s: AiSettings): Anthropic {
     baseURL: proxy ? proxy.replace(/\/+$/, '') : undefined,
     dangerouslyAllowBrowser: true,
     maxRetries: 1,
+    // Il proxy registra i consumi per funzione: utile per capire cosa costa davvero.
+    defaultHeaders: feature ? { 'x-ricettario-feature': feature } : undefined,
   })
 }
 
-export async function getClient(): Promise<{ client: Anthropic; settings: AiSettings }> {
+export async function getClient(feature?: string): Promise<{ client: Anthropic; settings: AiSettings }> {
   const settings = await loadAiSettings()
-  return { client: makeClient(settings), settings }
+  return { client: makeClient(settings, feature), settings }
 }
 
 /** Messaggio leggibile per l'utente a partire da un errore del SDK. */

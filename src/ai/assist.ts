@@ -36,8 +36,8 @@ export async function askAboutRecipe(
   params: { recipe: Recipe; factor: number; sessions: CookSession[]; history: ChatTurn[]; question: string; stepContext?: string },
   onDelta: (text: string) => void,
 ): Promise<{ text: string; costUsd: number }> {
-  const { client, settings } = await getClient()
   const inKitchen = Boolean(params.stepContext)
+  const { client, settings } = await getClient(inKitchen ? 'cucina' : 'domanda')
   const model = inKitchen && settings.fastKitchenAnswers ? KITCHEN_MODEL : settings.model
   // Il contesto stabile (ricetta e diario) sta in un blocco di sistema con cache: dalla seconda
   // domanda si paga un decimo. Ciò che cambia (fattore, passaggio, domanda) va nel messaggio.
@@ -78,7 +78,7 @@ export async function askAboutRecipe(
 
 /** Produce una variante completa della ricetta seguendo un'istruzione. */
 export async function proposeVariant(params: { recipe: Recipe; sessions: CookSession[]; instruction: string }): Promise<ConversionResult & { costUsd: number }> {
-  const { client, settings } = await getClient()
+  const { client, settings } = await getClient('variante')
   const response = await client.messages.parse({
     model: settings.model,
     max_tokens: 16000,

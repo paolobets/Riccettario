@@ -1,7 +1,8 @@
-import { db, type CookSession } from './db'
+import { db, type Chat, type CookSession } from './db'
 import { sampleRecipes } from './samples'
 import type { Recipe } from '@/core'
 import { newId } from '@/core'
+import { scheduleSync } from './sync'
 
 const SEEDED_KEY = 'seeded'
 
@@ -17,15 +18,39 @@ export async function seedIfEmpty(): Promise<void> {
 export async function saveRecipe(recipe: Recipe): Promise<Recipe> {
   const saved = { ...recipe, updatedAt: new Date().toISOString() }
   await db.recipes.put(saved)
+  scheduleSync()
   return saved
 }
 
+/** Cancella ricetta, diario e conversazioni, lasciando le lapidi perché la cancellazione arrivi agli altri dispositivi. */
 export async function deleteRecipe(id: string): Promise<void> {
-  await db.transaction('rw', db.recipes, db.sessions, db.chats, async () => {
+  const deletedAt = new Date().toISOString()
+  await db.transaction('rw', db.recipes, db.sessions, db.chats, db.tombstones, async () => {
+    const sessionIds = await db.sessions.where('recipeId').equals(id).primaryKeys()
+    const chatIds = await db.chats.where('recipeId').equals(id).primaryKeys()
     await db.recipes.delete(id)
-    await db.sessions.where('recipeId').equals(id).delete()
-    await db.chats.where('recipeId').equals(id).delete()
+    await db.sessions.bulkDelete(sessionIds)
+    await db.chats.bulkDelete(chatIds)
+    await db.tombstones.bulkPut([
+      { table: 'recipes', id, deletedAt },
+      ...sessionIds.map((sid) => ({ table: 'sessions' as const, id: sid, deletedAt })),
+      ...chatIds.map((cid) => ({ table: 'chats' as const, id: cid, deletedAt })),
+    ])
   })
+  scheduleSync()
+}
+
+export async function saveChat(chat: Chat): Promise<void> {
+  await db.chats.put(chat)
+  scheduleSync()
+}
+
+export async function deleteChat(id: string): Promise<void> {
+  await db.transaction('rw', db.chats, db.tombstones, async () => {
+    await db.chats.delete(id)
+    await db.tombstones.put({ table: 'chats', id, deletedAt: new Date().toISOString() })
+  })
+  scheduleSync()
 }
 
 export async function duplicateRecipe(recipe: Recipe): Promise<Recipe> {
@@ -37,6 +62,7 @@ export async function duplicateRecipe(recipe: Recipe): Promise<Recipe> {
     updatedAt: new Date().toISOString(),
   }
   await db.recipes.put(copy)
+  scheduleSync()
   return copy
 }
 
@@ -62,19 +88,26 @@ export async function recordSession(
 ): Promise<CookSession> {
   const s: CookSession = { id: newId('s'), recipeId, factor, startedAt, finishedAt: new Date().toISOString(), ...data }
   await db.sessions.put(s)
+  scheduleSync()
   return s
 }
 
 export async function exportAll(): Promise<string> {
   const recipes = await db.recipes.toArray()
   const sessions = await db.sessions.toArray()
-  return JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), recipes, sessions }, null, 2)
+  const chats = await db.chats.toArray()
+  return JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), recipes, sessions, chats }, null, 2)
 }
 
 export async function importJson(text: string): Promise<number> {
-  const data = JSON.parse(text) as { recipes?: Recipe[]; sessions?: CookSession[] }
+  const data = JSON.parse(text) as { recipes?: Recipe[]; sessions?: CookSession[]; chats?: Chat[] }
   const recipes = Array.isArray(data.recipes) ? data.recipes : []
-  await db.recipes.bulkPut(recipes)
+  if (!Array.isArray(data.recipes)) throw new Error('nel file non c\'è l\'elenco "recipes"')
+  // Le ricette importate contano come modificate ora: così arrivano anche agli altri dispositivi.
+  const now = new Date().toISOString()
+  await db.recipes.bulkPut(recipes.map((r) => ({ ...r, updatedAt: now })))
   if (Array.isArray(data.sessions)) await db.sessions.bulkPut(data.sessions)
+  if (Array.isArray(data.chats)) await db.chats.bulkPut(data.chats)
+  scheduleSync()
   return recipes.length
 }
