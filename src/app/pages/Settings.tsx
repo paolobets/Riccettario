@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { exportAll, importJson } from '@/data/repo'
-import { DEFAULT_MODEL, loadAiSettings, MODELS, saveAiSettings, type AiSettings } from '@/ai/settings'
+import { DEFAULT_MODEL, HOSTED, loadAiSettings, MODELS, saveAiSettings, type AiSettings } from '@/ai/settings'
 import { formatUsd, loadUsage, resetUsage, type UsageTotals } from '@/ai/usage'
+import { fetchAccount, type Account } from '@/ai/account'
 import { loadTheme, saveTheme, type Theme } from '../theme'
 import Icon from '../components/Icon'
 
@@ -13,8 +14,12 @@ export default function Settings() {
   const [showKey, setShowKey] = useState(false)
   const [usage, setUsage] = useState<UsageTotals | null>(null)
   const [theme, setTheme] = useState<Theme>(() => loadTheme())
+  const [account, setAccount] = useState<Account | null>(null)
   useEffect(() => {
-    loadAiSettings().then(setAi)
+    loadAiSettings().then((s) => {
+      setAi(s)
+      fetchAccount(s).then(setAccount)
+    })
     loadUsage().then(setUsage)
   }, [])
 
@@ -70,16 +75,18 @@ export default function Settings() {
       <section className="rule space-y-3 pt-4">
         <h2 className="section-title text-lg">Assistente AI</h2>
         <p className="text-sm text-muted">
-          Serve per importare ricette da testo e foto, fare domande e creare varianti. La chiave resta solo su questo dispositivo e viene inviata esclusivamente ad Anthropic (o al tuo proxy). Ogni richiesta ha un costo sul tuo account.
+          {HOSTED
+            ? 'Serve per importare ricette da testo, foto e siti, fare domande e creare varianti. Le richieste passano dal server dell\'app con una chiave condivisa: inserisci la password personale che hai ricevuto. Ogni persona ha un budget mensile.'
+            : 'Serve per importare ricette da testo e foto, fare domande e creare varianti. La chiave resta solo su questo dispositivo e viene inviata esclusivamente ad Anthropic (o al tuo proxy). Ogni richiesta ha un costo sul tuo account.'}
         </p>
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-fg-2">Chiave API Anthropic</span>
+          <span className="mb-1 block font-medium text-fg-2">{HOSTED ? 'La tua password del Ricettario' : 'Chiave API Anthropic'}</span>
           <div className="flex gap-2">
             <input
               className="min-w-0 flex-1 font-mono text-sm"
               type={showKey ? 'text' : 'password'}
               autoComplete="off"
-              placeholder="sk-ant-…"
+              placeholder={HOSTED ? 'la password che hai ricevuto' : 'sk-ant-…'}
               value={ai.apiKey}
               onChange={(e) => {
                 setAi({ ...ai, apiKey: e.target.value })
@@ -116,6 +123,7 @@ export default function Settings() {
             <span className="block text-muted">Le domande fatte durante la cottura usano Claude Haiku 5.5: risposte brevi, costo quaranta volte più basso.</span>
           </span>
         </label>
+        {!HOSTED && (
         <details className="text-sm">
           <summary className="cursor-pointer text-fg-2">Opzionale: proxy per non tenere la chiave nel browser</summary>
           <p className="mt-2 text-muted">
@@ -123,18 +131,42 @@ export default function Settings() {
           </p>
           <input className="mt-2 w-full" type="url" placeholder="https://ricettario-proxy.xxx.workers.dev" aria-label="Indirizzo del proxy" value={ai.proxyUrl} onChange={(e) => { setAi({ ...ai, proxyUrl: e.target.value }); setAiSaved(false) }} />
         </details>
+        )}
         <div className="flex items-center gap-3">
           <button
             className="btn-primary"
             onClick={async () => {
               await saveAiSettings(ai)
               setAiSaved(true)
+              setAccount(await fetchAccount(ai))
             }}
           >
             Salva
           </button>
           {aiSaved && <span className="text-sm text-success">Salvato.</span>}
         </div>
+        {account && (
+          <div className="rounded-lg bg-surface-2 p-3 text-sm text-fg-2" role="status">
+            {account.usage ? (
+              <>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span>
+                    Il tuo mese ({account.user}): <b>{formatUsd(account.usage.costUsd)}</b> su {formatUsd(account.budgetUsd)}
+                  </span>
+                  <span className="text-muted">{account.usage.requests} richieste</span>
+                </div>
+                <div className="mt-2 h-1.5 w-full rounded-full bg-surface-3" aria-hidden="true">
+                  <div
+                    className={`h-1.5 rounded-full ${account.usage.costUsd / account.budgetUsd > 0.8 ? 'bg-warning' : 'bg-accent'}`}
+                    style={{ width: `${Math.min(100, (account.usage.costUsd / account.budgetUsd) * 100)}%` }}
+                  />
+                </div>
+              </>
+            ) : (
+              <span>Collegato come {account.user}. La misura dei consumi non è attiva sul server.</span>
+            )}
+          </div>
+        )}
         {usage && usage.requests > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-2 p-3 text-sm text-fg-2">
             <span>

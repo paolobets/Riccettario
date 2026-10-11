@@ -12,9 +12,11 @@ App ricettario personale, installabile come PWA e funzionante offline, con tre i
 
 ## Come provarla
 
-**Dal telefono o dal browser, senza installare nulla.** Ogni push su `main` pubblica l'app su GitHub Pages tramite `.github/workflows/deploy.yml`: l'indirizzo è `https://<utente>.github.io/<nome-repo>/` (per questo repository: https://paolobets.github.io/Riccettario/). Aprila, poi "Aggiungi alla schermata Home" per averla come app: funziona anche offline. Le ricette restano nel browser del dispositivo; usa *Impostazioni → Esporta* per il backup.
+**Su Cloudflare Pages, con il proxy integrato (consigliato).** App e proxy per l'AI girano insieme: ogni persona riceve una password, la chiave Anthropic resta nei segreti del progetto, i consumi sono contati per persona con un budget mensile. La guida passo passo è in [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md); il messaggio da mandare a chi prova l'app in [docs/BENVENUTO-TESTER.md](docs/BENVENUTO-TESTER.md).
 
-Se la pubblicazione non parte al primo push, in *Settings → Pages* del repository imposta la sorgente su "GitHub Actions" e rilancia il workflow.
+**Su GitHub Pages, ognuno con la propria chiave.** Ogni push su `main` pubblica l'app tramite `.github/workflows/deploy.yml` su `https://<utente>.github.io/<nome-repo>/` (per questo repository: https://paolobets.github.io/Riccettario/). Se la pubblicazione non parte al primo push, in *Settings → Pages* del repository imposta la sorgente su "GitHub Actions" e rilancia il workflow.
+
+In entrambi i casi: apri l'indirizzo sul telefono, poi "Aggiungi alla schermata Home" per averla come app, anche offline. Le ricette restano nel browser del dispositivo e sono legate all'indirizzo: per cambiare indirizzo o dispositivo usa *Impostazioni → Esporta / Importa da file*.
 
 **In locale:**
 
@@ -50,7 +52,8 @@ src/
     hooks/     useScaler (fattore nell'URL, `?f=1.5`)
     timers/    store dei timer attivi, persistito in localStorage
   ai/          client Anthropic, schema di scambio (zod) e conversione in Recipe, import, domande, varianti, suggerimenti
-proxy/         worker Cloudflare opzionale che custodisce la chiave API
+functions/     proxy per l'AI come funzione di Cloudflare Pages (/api): password personali, budget, misura
+proxy/         lo stesso proxy come worker a sé, per chi tiene l'app su un altro host
     branding.ts nome, descrizione e colori dell'app
 docs/
   MODELLO-DATI.md  schema della ricetta e regole di scalatura
@@ -63,7 +66,7 @@ Il motore di scalatura (`src/core/scaling.ts`) è deterministico e testato: l'in
 
 Serve una chiave API Anthropic, da inserire in *Impostazioni → Assistente AI*. La chiave resta in IndexedDB sul dispositivo e viene inviata solo ad Anthropic. Ogni richiesta ha un costo sul tuo account: il modello predefinito è Claude Opus 5.5, si può scegliere Sonnet o Haiku per spendere meno.
 
-Chi preferisce non tenere la chiave nel browser può pubblicare `proxy/cloudflare-worker.js` su Cloudflare Workers (istruzioni nel file): l'app parla col proxy usando una password e il proxy aggiunge la vera chiave.
+Chi pubblica su Cloudflare Pages ha il proxy già incluso su `/api` (`functions/`): password personali (`USERS`), budget mensile per persona e tetto giornaliero, rotte `/me` e `/admin/usage` per i consumi, `/fetch` per leggere le pagine dei siti. Lo stesso codice si pubblica anche come worker a sé (`proxy/cloudflare-worker.js`) per chi tiene l'app altrove. In Impostazioni l'app mostra "Il tuo mese" quando il proxy ha la misura attiva; a budget esaurito l'assistente lo dice chiaramente e riparte il mese dopo.
 
 Il codice dell'AI è in `src/ai/` e viene caricato solo quando serve, così il resto dell'app resta leggero e offline. Ogni risposta mostra il costo reale della richiesta (dai token riportati dall'API, cache compresa) e in *Impostazioni* c'è il totale speso. Le conversazioni restano salvate per ricetta e sono disponibili anche in modalità cucina, dove il bottone "Chiedi" passa all'AI il passaggio corrente.
 

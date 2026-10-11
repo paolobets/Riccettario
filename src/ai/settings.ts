@@ -18,6 +18,17 @@ export interface AiSettings {
 /** Modello usato per le domande in cucina quando `fastKitchenAnswers` è attivo. */
 export const KITCHEN_MODEL = 'claude-haiku-5-5'
 
+/**
+ * Proxy predefinito quando l'app è pubblicata insieme alla sua funzione (Cloudflare Pages):
+ * la variabile di build VITE_DEFAULT_PROXY vale "/api" e l'utente deve inserire solo la propria password.
+ */
+export const DEFAULT_PROXY_URL: string =
+  typeof window !== 'undefined' && import.meta.env.VITE_DEFAULT_PROXY
+    ? new URL(import.meta.env.VITE_DEFAULT_PROXY, window.location.origin).toString().replace(/\/+$/, '')
+    : ''
+/** Vero quando l'app gira con il proxy integrato: la chiave personale è una password, non una chiave Anthropic. */
+export const HOSTED = DEFAULT_PROXY_URL !== ''
+
 export const DEFAULT_MODEL = 'claude-opus-5-5'
 export const MODELS: Array<{ id: string; label: string }> = [
   { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (consigliato)' },
@@ -30,7 +41,7 @@ const KEY = 'ai'
 export async function loadAiSettings(): Promise<AiSettings> {
   const row = await db.settings.get(KEY)
   const v = (row?.value ?? {}) as Partial<AiSettings>
-  return { apiKey: v.apiKey ?? '', proxyUrl: v.proxyUrl ?? '', model: v.model ?? DEFAULT_MODEL, fastKitchenAnswers: v.fastKitchenAnswers ?? true }
+  return { apiKey: v.apiKey ?? '', proxyUrl: v.proxyUrl || DEFAULT_PROXY_URL, model: v.model ?? DEFAULT_MODEL, fastKitchenAnswers: v.fastKitchenAnswers ?? true }
 }
 
 export async function saveAiSettings(s: AiSettings): Promise<void> {

@@ -2,7 +2,7 @@
 
 ## Dove
 
-- **Online**: https://paolobets.github.io/Riccettario/ (si aggiorna a ogni push su `main`, dopo un paio di minuti).
+- **Online**: https://ricettario.pages.dev (Cloudflare Pages, con l'assistente già collegato: serve solo la password personale in *Impostazioni*). Lo specchio su GitHub Pages, https://paolobets.github.io/Riccettario/, richiede invece una chiave Anthropic propria. Entrambi si aggiornano a ogni push su `main`.
 - **Sul telefono come app**: apri l'indirizzo in Safari (iPhone) o Chrome (Android), poi *Condividi → Aggiungi alla schermata Home*. Da lì parte a schermo intero e funziona anche offline.
 - **In locale**: `pnpm install && pnpm dev`, poi http://localhost:5173.
 
@@ -35,7 +35,7 @@ Le ricette vivono nel browser del dispositivo: telefono e computer hanno archivi
 - [ ] Nel riepilogo controlla la "Prova di scalatura ×2", poi salva.
 
 ### 5. Assistente AI (serve la chiave)
-- [ ] *Impostazioni → Assistente AI*: incolla la chiave Anthropic, scegli il modello, salva.
+- [ ] *Impostazioni → Assistente AI*: incolla la tua password (su pages.dev) o la chiave Anthropic (su GitHub Pages), scegli il modello, salva. Su pages.dev compare "Il tuo mese: … su 3,00 $".
 - [ ] *Importa → Testo*: incolla una ricetta qualsiasi (anche presa da un sito). Controlla nel riepilogo ingredienti, regole di scalatura e passaggi, poi salva. Sotto il banner c'è il costo della richiesta.
 - [ ] *Importa → Foto*: fotografa una pagina di un libro di ricette.
 - [ ] *Importa → Sito*: incolla l'URL di una ricetta (Giallozafferano, Cucchiaio d'argento, un blog). Con il proxy configurato lo stato dice «Trovata "…", la strutturo»: la pagina è stata letta dai dati strutturati, costo di pochi centesimi. Senza proxy, o se la pagina non li espone, lo stato dice che la fa leggere all'AI. Se fallisce, segnalalo con l'URL usato.

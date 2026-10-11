@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { loadAiSettings, isAiConfigured, type AiSettings } from './settings'
+import { HOSTED, loadAiSettings, isAiConfigured, type AiSettings } from './settings'
 
 export class AiNotConfiguredError extends Error {
   constructor() {
@@ -30,9 +30,20 @@ export async function getClient(): Promise<{ client: Anthropic; settings: AiSett
 }
 
 /** Messaggio leggibile per l'utente a partire da un errore del SDK. */
+/** Messaggio del proxy (budget esaurito, password sbagliata), se la risposta d'errore lo porta. */
+function proxyMessage(e: unknown): string | null {
+  const body = (e as { error?: { error?: { type?: string; message?: string } } }).error
+  const inner = body?.error
+  if (inner?.type === 'budget_exceeded' && inner.message) return inner.message
+  if (inner?.type === 'authentication_error' && inner.message?.includes('Password')) return inner.message
+  return null
+}
+
 export function describeAiError(e: unknown): string {
   if (e instanceof AiNotConfiguredError) return e.message
-  if (e instanceof Anthropic.AuthenticationError) return 'Chiave API non valida.'
+  const fromProxy = e instanceof Anthropic.APIError ? proxyMessage(e) : null
+  if (fromProxy) return fromProxy
+  if (e instanceof Anthropic.AuthenticationError) return HOSTED ? 'Password non valida: controlla quella inserita in Impostazioni.' : 'Chiave API non valida.'
   if (e instanceof Anthropic.PermissionDeniedError) return 'Accesso negato: controlla chiave e proxy.'
   if (e instanceof Anthropic.RateLimitError) return 'Troppe richieste: riprova tra qualche secondo.'
   if (e instanceof Anthropic.BadRequestError) return `Richiesta non valida: ${e.message}`
