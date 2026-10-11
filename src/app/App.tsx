@@ -15,6 +15,8 @@ import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import ForgotPage from './pages/auth/ForgotPage'
 import ResetPage from './pages/auth/ResetPage'
+import ShoppingPage from './pages/ShoppingPage'
+import SharedPage from './pages/SharedPage'
 
 export default function App() {
   const [ready, setReady] = useState(false)
@@ -37,6 +39,8 @@ export default function App() {
         <Route path="impostazioni" element={<Settings />} />
         <Route path="importa" element={<ImportPage />} />
         <Route path="cosa-preparo" element={<SuggestPage />} />
+        <Route path="spesa" element={<ShoppingPage />} />
+        <Route path="condivisa" element={<SharedPage />} />
         <Route path="accedi" element={<LoginPage />} />
         <Route path="registrati" element={<RegisterPage />} />
         <Route path="password-dimenticata" element={<ForgotPage />} />

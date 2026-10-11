@@ -15,7 +15,7 @@ interface Props {
   scaled: ScaledRecipe
   onPivot?: (ingredientId: string, amountInBaseUnit: number) => PivotResult
   checkable?: boolean
-  /** Se dato, le spunte sopravvivono al ricaricamento della pagina (sessionStorage). */
+  /** Se dato, le spunte sopravvivono al ricaricamento e alla chiusura dell'app (localStorage). */
   storageKey?: string
 }
 
@@ -32,7 +32,7 @@ function groupBySection(items: ScaledIngredient[]): Array<[string | undefined, S
 function loadChecked(key?: string): Set<string> {
   if (!key) return new Set()
   try {
-    const raw = sessionStorage.getItem(key)
+    const raw = localStorage.getItem(key)
     return new Set(raw ? (JSON.parse(raw) as string[]) : [])
   } catch {
     return new Set()
@@ -54,7 +54,7 @@ export default function IngredientList({ scaled, onPivot, checkable, storageKey 
   useEffect(() => {
     if (!storageKey) return
     try {
-      sessionStorage.setItem(storageKey, JSON.stringify([...checked]))
+      localStorage.setItem(storageKey, JSON.stringify([...checked]))
     } catch {
       // storage non disponibile
     }

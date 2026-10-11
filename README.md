@@ -10,6 +10,8 @@ App ricettario personale, installabile come PWA e funzionante offline, con tre i
 
 5. **Cosa preparo?**: scegli il pasto, il tempo che hai ai fornelli e cosa c'è in casa; l'app pesca tra le tue ricette (preferendo quelle che usano quello che hai e che non cucini da un po') e, se vuoi, chiede all'AI una seconda opinione o un piatto nuovo.
 
+6. **Intorno alla ricetta**: lista della spesa che somma gli ingredienti di più ricette con le loro porzioni; "Pronto per le 20:00" che calcola a ritroso quando iniziare ogni passaggio; ripresa di una cottura interrotta; scalatura per teglia; preferiti, ordinamento e diario in lista; controllo della ricetta nel wizard; stampa e condivisione con un link che contiene la ricetta.
+
 ## Come provarla
 
 **Su Cloudflare Pages, con backend e database (consigliato).** App e backend girano insieme: ogni persona entra con email e password (su invito, o con registrazione aperta), le sue ricette si sincronizzano tra i dispositivi, la chiave Anthropic resta nei segreti del progetto, i consumi sono contati per persona con un budget mensile. La guida passo passo è in [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md); il messaggio da mandare a chi prova l'app in [docs/BENVENUTO-TESTER.md](docs/BENVENUTO-TESTER.md).
@@ -83,4 +85,4 @@ Identità da quaderno di cucina: carattere Fraunces (serif variabile, incluso ne
 
 ## Dati
 
-Le ricette vivono in IndexedDB sul dispositivo. Da *Impostazioni* si esporta e importa un file JSON. Alla prima apertura vengono caricate tre ricette di esempio (impasto per pizza, carbonara, tiramisù) che mostrano le diverse regole di scalatura.
+Le ricette vivono in IndexedDB sul dispositivo (e sul server, con il backend). La lista della spesa e lo stato di una cottura in corso restano solo sul dispositivo. Da *Impostazioni* si esporta e importa un file JSON. Alla prima apertura vengono caricate tre ricette di esempio (impasto per pizza, carbonara, tiramisù) che mostrano le diverse regole di scalatura.

@@ -11,6 +11,8 @@ interface Recipe {
   description?: string
   servings: number            // porzioni per cui sono scritte le quantità
   yield?: { amount: number; unit: string }   // resa totale di riferimento (es. 850 g)
+  pan?: { shape: 'round'; diameterCm: number } | { shape: 'rect'; widthCm: number; lengthCm: number }  // teglia di riferimento
+  favorite?: boolean          // stella
   tags: string[]
   sections?: string[]         // es. ["Crema", "Montaggio"]
   ingredients: Ingredient[]
@@ -57,6 +59,7 @@ Dopo la scalatura le quantità lineari e sub-lineari vengono **arrotondate a mis
 
 - **Porzioni**: F = porzioni richieste / porzioni della ricetta.
 - **Resa**: F = resa richiesta / resa della ricetta (serve `yield`).
+- **Teglia**: F = area della teglia scelta / area della teglia della ricetta (serve `pan`); tonda = π(d/2)², rettangolare = lato × lato. Lo spessore resta quello pensato dall'autore; i tempi di cottura, come sempre, non scalano (`pan.ts`).
 - **Pivot**: l'utente dichiara la quantità di un ingrediente. Per `linear` e `discrete` F = nuova / originale; per `sublinear` si inverte la curva (F = (nuova/originale)^(1/e)); per `bakersPercent` si risale alla base. `fixed` e `toTaste` non possono guidare la scalatura.
 
 ### Fattori fattibili
@@ -96,6 +99,22 @@ interface Step {
 I timer avviati (da lettura o da modalità cucina) vivono in un unico store persistito in `localStorage` (`src/app/timers/store.tsx`), identificati da `ricetta:passaggio`. Una barra sempre visibile li mostra tutti; toccandone uno in modalità cucina si salta al passaggio. Il conto alla rovescia usa un timestamp di fine, quindi regge a ricaricamenti e sospensioni del tab.
 
 `renderStep` in `steps.ts` sostituisce i riferimenti con la quantità già scalata ("350 g di acqua"), così lettura e modalità cucina mostrano sempre i numeri giusti.
+
+## Lista della spesa
+
+`buildShoppingList` (`shopping.ts`) prende più ricette con il loro fattore, le scala e somma gli ingredienti che hanno lo stesso nome normalizzato (minuscolo, senza parentesi) e la stessa unità base (g, ml, o l'unità di conteggio). Le voci "quanto basta" si agganciano alla riga quantificata con lo stesso nome, altrimenti fanno riga a sé; un ingrediente è facoltativo solo se lo è in tutte le ricette. La lista vive in Dexie (`lists`, una sola riga `current`) e solo sul dispositivo: non viene sincronizzata.
+
+## Pronto per le 20:00
+
+`planBackwards` (`schedule.ts`) parte dall'ora del pasto e va a ritroso: i passaggi in sequenza sommano la loro durata (timer o `durationMin`, la più lunga), quelli con `parallelWith` iniziano insieme al passaggio padre e non allungano il percorso. Restituisce l'ora di inizio di ogni passaggio e quella complessiva; la modalità cucina la mostra nella mise en place e manda una notifica all'ora di avvio dei passaggi finché resta aperta. Lo stato della cottura (inizio, passo corrente, orario scelto) è in `localStorage` e scade dopo un giorno: così dalla ricetta si può "riprendere dal passo 4".
+
+## Controllo della ricetta
+
+`checkRecipe` (`lint.ts`) produce consigli non bloccanti mostrati nel riepilogo del wizard: titolo o porzioni mancanti, ingredienti mai citati, uova con regola lineare, passaggi di cottura o riposo da 10 minuti in su senza timer, riposi da 20 minuti in su senza nulla in parallelo, passaggi vuoti o paralleli a un passaggio inesistente, percentuale del panettiere senza base.
+
+## Condivisione
+
+`recipeToText` scrive la ricetta come testo con le dosi già scalate; `encodeRecipeForLink` la mette dentro un link (`/condivisa#r=…`, base64url del JSON senza id, date e preferiti) che l'app apre proponendo di salvarla come copia propria.
 
 ## Scambio con l'AI
 

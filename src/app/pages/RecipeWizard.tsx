@@ -11,6 +11,8 @@ import {
   formatQuantity,
   formatUnit,
   scaleRecipe,
+  checkRecipe,
+  type Pan,
   type Ingredient,
   type Recipe,
   type ScalingMode,
@@ -66,6 +68,9 @@ function fromRecipe(r: Recipe) {
     servings: String(r.servings),
     yieldAmount: r.yield ? String(r.yield.amount) : '',
     yieldUnit: r.yield?.unit ?? '',
+    panShape: (r.pan?.shape ?? '') as Pan['shape'] | '',
+    panA: r.pan ? String(r.pan.shape === 'round' ? r.pan.diameterCm : r.pan.widthCm) : '',
+    panB: r.pan?.shape === 'rect' ? String(r.pan.lengthCm) : '',
     tags: r.tags.join(', '),
     notes: r.notes ?? '',
     source: r.source ?? '',
@@ -147,12 +152,17 @@ function toRecipe(d: Draft, base: Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>
     })
   const sections = [...new Set([...ingredients, ...steps].map((x) => x.section).filter((x): x is string => Boolean(x)))]
   const yieldAmount = num(d.yieldAmount)
+  const panA = num(d.panA)
+  const panB = num(d.panB)
+  const pan: Pan | undefined =
+    d.panShape === 'round' && panA ? { shape: 'round', diameterCm: panA } : d.panShape === 'rect' && panA && panB ? { shape: 'rect', widthCm: panA, lengthCm: panB } : undefined
   return {
     ...base,
     title: d.title.trim(),
     description: d.description.trim() || undefined,
     servings: num(d.servings) ?? 1,
     yield: yieldAmount ? { amount: yieldAmount, unit: d.yieldUnit.trim() || 'g' } : undefined,
+    pan,
     tags: d.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
     sections: sections.length ? sections : undefined,
     ingredients,
@@ -314,6 +324,25 @@ function PhaseInfo({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => v
         <Field label="Tag" hint="Separati da virgola">
           <input className="w-full" value={draft.tags} onChange={(e) => set({ tags: e.target.value })} />
         </Field>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="Teglia (opz.)" hint="Per riscalare cambiando teglia">
+          <select className="w-full" value={draft.panShape} onChange={(e) => set({ panShape: e.target.value as Draft['panShape'] })}>
+            <option value="">nessuna</option>
+            <option value="round">tonda</option>
+            <option value="rect">rettangolare</option>
+          </select>
+        </Field>
+        {draft.panShape && (
+          <Field label={draft.panShape === 'round' ? 'Diametro, cm' : 'Lato, cm'}>
+            <input className="w-full" type="number" min={1} step="any" value={draft.panA} onChange={(e) => set({ panA: e.target.value })} />
+          </Field>
+        )}
+        {draft.panShape === 'rect' && (
+          <Field label="Altro lato, cm">
+            <input className="w-full" type="number" min={1} step="any" value={draft.panB} onChange={(e) => set({ panB: e.target.value })} />
+          </Field>
+        )}
       </div>
       <Field label="Fonte (opz.)">
         <input className="w-full" value={draft.source} onChange={(e) => set({ source: e.target.value })} placeholder="Libro, sito, nonna…" />
@@ -589,19 +618,12 @@ function PhaseSteps({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => 
 function PhaseReview({ recipe }: { recipe: Recipe }) {
   const scaled = useMemo(() => scaleRecipe(recipe, 1), [recipe])
   const doubled = useMemo(() => scaleRecipe(recipe, 2), [recipe])
-  const problems: string[] = []
-  if (!recipe.title) problems.push('Manca il titolo.')
-  if (recipe.ingredients.length === 0) problems.push('Nessun ingrediente.')
-  if (recipe.steps.length === 0) problems.push('Nessun passaggio.')
-  for (const i of recipe.ingredients) {
-    const rule = i.scaling
-    if (rule?.mode === 'bakersPercent' && (!rule.of || !recipe.ingredients.some((b) => b.id === rule.of && b.id !== i.id)))
-      problems.push(`"${i.name}": percentuale del panettiere senza ingrediente base.`)
-  }
+  const problems = useMemo(() => checkRecipe(recipe), [recipe])
   return (
     <section className="space-y-3">
       {problems.length > 0 && (
         <div className="notice space-y-1 bg-warning-soft text-warning">
+          <p className="font-medium">Controllo della ricetta: {problems.length === 1 ? 'un consiglio' : `${problems.length} consigli`}. Puoi salvare lo stesso.</p>
           {problems.map((p) => (
             <p key={p} className="flex items-start gap-1">
               <Icon name="alert" size={14} className="mt-0.5" /> {p}

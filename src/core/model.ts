@@ -101,6 +101,9 @@ export interface Yield {
   unit: string
 }
 
+/** Teglia o stampo per cui è scritta la ricetta: cambiandola il fattore è il rapporto tra le aree. */
+export type Pan = { shape: 'round'; diameterCm: number } | { shape: 'rect'; widthCm: number; lengthCm: number }
+
 export interface Recipe {
   id: string
   title: string
@@ -109,6 +112,10 @@ export interface Recipe {
   servings: number
   /** Resa totale di riferimento (es. 800 g di impasto), opzionale. */
   yield?: Yield
+  /** Teglia di riferimento, opzionale: abilita la scalatura per teglia. */
+  pan?: Pan
+  /** Segnata con la stella. */
+  favorite?: boolean
   tags: string[]
   sections?: string[]
   ingredients: Ingredient[]

@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
-import { deleteRecipe, duplicateRecipe, saveRecipe } from '@/data/repo'
-import { activeDuration, formatDuration, STEP_TYPE_LABELS, totalDuration } from '@/core'
+import { addToShoppingList, deleteRecipe, duplicateRecipe, saveRecipe, toggleFavorite } from '@/data/repo'
+import { activeDuration, encodeRecipeForLink, formatDuration, formatPan, recipeToText, STEP_TYPE_LABELS, totalDuration } from '@/core'
+import { clearCookState, loadCookState, type CookState } from '../cook/state'
 import { useScaler } from '../hooks/useScaler'
 import ScalerPanel from '../components/ScalerPanel'
 import IngredientList from '../components/IngredientList'
@@ -37,6 +38,8 @@ export default function RecipeView() {
   const { confirm, dialog } = useConfirm()
   /** Testo della nota in modifica; `null` quando non si sta modificando. */
   const [notesDraft, setNotesDraft] = useState<string | null>(null)
+  const [cook, setCook] = useState<CookState | null>(() => (id ? loadCookState(id) : null))
+  const [message, setMessage] = useState<string | null>(null)
 
   if (recipe === undefined) return null
   if (recipe === null || !scaler.scaled) return <NotFound what="ricetta" />
@@ -44,6 +47,22 @@ export default function RecipeView() {
   const total = totalDuration(recipe.steps)
   const active = activeDuration(recipe.steps)
   const cookLink = `/ricetta/${recipe.id}/cucina${scaler.search ? `?${scaler.search}` : ''}`
+  const resumeLink = cook?.step !== undefined ? `${cookLink}${scaler.search ? '&' : '?'}passo=${cook.step + 1}` : null
+
+  const share = async () => {
+    const text = recipeToText(scaled)
+    const url = `${window.location.origin}${import.meta.env.BASE_URL}condivisa#r=${encodeRecipeForLink(recipe)}`
+    try {
+      if (navigator.share && /Android|iPhone|iPad/.test(navigator.userAgent)) {
+        await navigator.share({ title: recipe.title, text, url })
+        return
+      }
+      await navigator.clipboard.writeText(`${text}\n\nApri nel Ricettario: ${url}`)
+      setMessage('Ricetta copiata con il link: incollala in un messaggio.')
+    } catch {
+      setMessage('Non sono riuscito a condividere: prova con Stampa o copia il testo a mano.')
+    }
+  }
 
   const saveNotes = async () => {
     if (notesDraft === null) return
@@ -56,15 +75,23 @@ export default function RecipeView() {
     <article className="space-y-5">
       {dialog}
       <header className="space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-4xl font-medium leading-tight text-fg">{recipe.title}</h1>
-          <div className="flex shrink-0 gap-1">
-            <Link to={`/ricetta/${recipe.id}/modifica`} className="btn-ghost min-h-10 px-2 py-1.5 text-sm" aria-label="Modifica">
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+          <h1 className="min-w-0 flex-1 basis-36 text-4xl font-medium leading-tight text-fg">{recipe.title}</h1>
+          <div className="flex shrink-0 gap-1 print:hidden">
+            <button
+              className={`btn-ghost min-h-10 min-w-10 px-2 py-1.5 text-sm ${recipe.favorite ? 'text-warning' : ''}`}
+              aria-label={recipe.favorite ? 'Togli dai preferiti' : 'Aggiungi ai preferiti'}
+              aria-pressed={Boolean(recipe.favorite)}
+              onClick={() => toggleFavorite(recipe)}
+            >
+              <Icon name="star" size={18} fill={recipe.favorite ? 'currentColor' : 'none'} />
+            </button>
+            <Link to={`/ricetta/${recipe.id}/modifica`} className="btn-ghost min-h-10 min-w-10 px-2 py-1.5 text-sm" aria-label="Modifica">
               <Icon name="edit" size={16} />
               <span className="hidden sm:inline">Modifica</span>
             </Link>
             <button
-              className="btn-ghost min-h-10 px-2 py-1.5 text-sm"
+              className="btn-ghost min-h-10 min-w-10 px-2 py-1.5 text-sm"
               aria-label="Duplica"
               onClick={async () => {
                 const copy = await duplicateRecipe(recipe)
@@ -75,7 +102,7 @@ export default function RecipeView() {
               <span className="hidden sm:inline">Duplica</span>
             </button>
             <button
-              className="btn-ghost min-h-10 px-2 py-1.5 text-sm text-danger"
+              className="btn-ghost min-h-10 min-w-10 px-2 py-1.5 text-sm text-danger"
               aria-label="Elimina"
               onClick={async () => {
                 const ok = await confirm({
@@ -98,6 +125,11 @@ export default function RecipeView() {
         </div>
         {recipe.description && <p className="text-lg text-fg-2">{recipe.description}</p>}
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
+          {recipe.pan && (
+            <span className="inline-flex items-center gap-1">
+              <Icon name="pan" size={14} /> teglia {formatPan(recipe.pan)}
+            </span>
+          )}
           {total > 0 && (
             <span className="inline-flex items-center gap-1">
               <Icon name="timer" size={14} />
@@ -115,10 +147,57 @@ export default function RecipeView() {
         </div>
       </header>
 
-      <Link to={cookLink} className="btn-primary w-full py-3 text-lg">
-        <Icon name="chef" size={22} /> Cucina passo per passo
-      </Link>
+      {resumeLink ? (
+        <div className="flex gap-2 print:hidden">
+          <Link to={resumeLink} className="btn-primary min-w-0 flex-1 py-3 text-lg">
+            <Icon name="play" size={22} /> Riprendi dal passo {cook!.step! + 1}
+          </Link>
+          <button
+            className="btn-secondary shrink-0 py-3"
+            onClick={() => {
+              clearCookState(recipe.id)
+              setCook(null)
+            }}
+          >
+            Ricomincia
+          </button>
+        </div>
+      ) : (
+        <Link to={cookLink} className="btn-primary w-full py-3 text-lg print:hidden">
+          <Icon name="chef" size={22} /> Cucina passo per passo
+        </Link>
+      )}
+      <div className="flex flex-wrap gap-2 print:hidden">
+        <button
+          className="btn-secondary min-h-10 px-3 py-1.5 text-sm"
+          onClick={async () => {
+            await addToShoppingList(recipe.id, scaled.factor)
+            setMessage(`Aggiunta alla lista della spesa per ${scaled.servings.toLocaleString('it-IT', { maximumFractionDigits: 1 })} porzioni.`)
+          }}
+        >
+          <Icon name="cart" size={16} /> Aggiungi alla spesa
+        </button>
+        <button className="btn-secondary min-h-10 px-3 py-1.5 text-sm" onClick={share}>
+          <Icon name="share" size={16} /> Condividi
+        </button>
+        <button className="btn-secondary min-h-10 px-3 py-1.5 text-sm" onClick={() => window.print()}>
+          <Icon name="printer" size={16} /> Stampa
+        </button>
+      </div>
+      {message && (
+        <p className="text-sm text-fg-2 print:hidden" role="status">
+          {message}{message.startsWith('Aggiunta') && (
+            <>
+              {' '}
+              <Link to="/spesa" className="text-accent-text underline-offset-2 hover:underline">
+                Apri la lista
+              </Link>
+            </>
+          )}
+        </p>
+      )}
 
+      <div className="print:hidden">
       <ScalerPanel
         recipe={recipe}
         scaled={scaled}
@@ -127,8 +206,11 @@ export default function RecipeView() {
         onFactor={scaler.setFactor}
         onReset={scaler.reset}
       />
+      </div>
 
-      <AiPanel recipe={recipe} factor={scaled.factor} />
+      <div className="print:hidden">
+        <AiPanel recipe={recipe} factor={scaled.factor} />
+      </div>
 
       <section className="rule pt-4">
         <h2 className="section-title mb-2">Ingredienti</h2>
@@ -178,7 +260,7 @@ export default function RecipeView() {
         <div className="mb-1 flex items-center justify-between gap-3">
           <h2 className="section-title">Note</h2>
           {notesDraft === null && (
-            <button className="btn-ghost min-h-9 px-2 py-1 text-sm" onClick={() => setNotesDraft(recipe.notes ?? '')}>
+            <button className="btn-ghost min-h-9 px-2 py-1 text-sm print:hidden" onClick={() => setNotesDraft(recipe.notes ?? '')}>
               <Icon name="edit" size={16} /> {recipe.notes ? 'Modifica' : 'Aggiungi una nota'}
             </button>
           )}

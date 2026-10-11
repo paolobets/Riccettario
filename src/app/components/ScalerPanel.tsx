@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import Icon from './Icon'
-import { formatFactor, isFactorFeasible, suggestFeasibleFactors, type Recipe, type ScaledRecipe } from '@/core'
+import { factorFromPan, formatFactor, formatPan, isFactorFeasible, suggestFeasibleFactors, type Pan, type Recipe, type ScaledRecipe } from '@/core'
 
 interface Props {
   recipe: Recipe
@@ -19,6 +19,10 @@ function yieldIsEditable(recipe: Recipe): boolean {
 
 export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFactor, onReset }: Props) {
   const [yieldInput, setYieldInput] = useState('')
+  const [panShape, setPanShape] = useState<Pan['shape']>(recipe.pan?.shape ?? 'round')
+  const [panA, setPanA] = useState('')
+  const [panB, setPanB] = useState('')
+  const panId = useId()
   const servingsId = useId()
   const yieldId = useId()
   const servings = Math.round(scaled.servings * 100) / 100
@@ -42,8 +46,8 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <label htmlFor={servingsId} className="w-24 text-sm text-muted">
+      <div className="flex flex-wrap items-center gap-3">
+        <label htmlFor={servingsId} className="w-full text-sm text-muted min-[360px]:w-24">
           Porzioni
         </label>
         <button className="btn-secondary h-11 w-11 p-0 text-xl" onClick={() => onServings(Math.max(1, Math.round(servings) - 1))} aria-label="Meno porzioni">
@@ -95,6 +99,38 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
           <button className="btn-secondary min-h-9 px-3 py-1.5 text-sm" type="submit" disabled={!yieldInput}>
             Applica
           </button>
+        </form>
+      )}
+
+      {recipe.pan && (
+        <form
+          className="space-y-1"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const a = Number(panA)
+            const b = Number(panB)
+            const target: Pan | null = panShape === 'round' ? (a > 0 ? { shape: 'round', diameterCm: a } : null) : a > 0 && b > 0 ? { shape: 'rect', widthCm: a, lengthCm: b } : null
+            const f = target ? factorFromPan(recipe, target) : null
+            if (f) onFactor(f)
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <label htmlFor={panId} className="w-24 shrink-0 text-sm text-muted">
+              Teglia
+            </label>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <select id={panId} className="min-w-0 py-1.5 text-sm" value={panShape} onChange={(e) => setPanShape(e.target.value as Pan['shape'])}>
+                <option value="round">tonda</option>
+                <option value="rect">rettangolare</option>
+              </select>
+              <input type="number" min={1} step="any" className="w-20 min-w-0 py-1.5" aria-label={panShape === 'round' ? 'Diametro in centimetri' : 'Lato in centimetri'} placeholder={panShape === 'round' ? 'Ø cm' : 'cm'} value={panA} onChange={(e) => setPanA(e.target.value)} />
+              {panShape === 'rect' && <input type="number" min={1} step="any" className="w-20 min-w-0 py-1.5" aria-label="Altro lato in centimetri" placeholder="cm" value={panB} onChange={(e) => setPanB(e.target.value)} />}
+              <button className="btn-secondary min-h-9 px-3 py-1.5 text-sm" type="submit" disabled={!panA || (panShape === 'rect' && !panB)}>
+                Applica
+              </button>
+            </div>
+          </div>
+          <p className="pl-27 text-xs text-muted">La ricetta è per una teglia {formatPan(recipe.pan)}: il fattore segue il rapporto tra le aree, lo spessore resta uguale.</p>
         </form>
       )}
 

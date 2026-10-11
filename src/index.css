@@ -246,3 +246,30 @@ dialog::backdrop {
     transition-duration: 0ms !important;
   }
 }
+
+/* Stampa: solo la ricetta, su sfondo bianco, senza comandi. */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #ffffff;
+    --fg: #000000;
+    --fg-2: #222222;
+    --muted: #444444;
+    --line: #bbbbbb;
+  }
+  body {
+    padding: 0;
+  }
+  main {
+    padding: 0 !important;
+  }
+  .card {
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
+  a[href]::after {
+    content: '';
+  }
+}

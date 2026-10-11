@@ -61,6 +61,7 @@ export const sampleRecipes: Recipe[] = [
     description: 'Il classico con savoiardi, uova pastorizzate a bagnomaria e mascarpone.',
     servings: 8,
     yield: { amount: 1, unit: 'teglia 30×20 cm' },
+    pan: { shape: 'rect', widthCm: 30, lengthCm: 20 },
     tags: ['dolci'],
     sections: ['Crema', 'Montaggio'],
     ingredients: [

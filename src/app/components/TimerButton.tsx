@@ -20,7 +20,7 @@ export default function TimerButton({ recipeId, stepId, timer, size = 'sm' }: Pr
   if (!active) {
     return (
       <button
-        className={`btn-secondary ${big ? 'px-6 py-3 text-lg' : 'min-h-8 px-3 py-1 text-sm'}`}
+        className={`print:hidden btn-secondary ${big ? 'px-6 py-3 text-lg' : 'min-h-8 px-3 py-1 text-sm'}`}
         onClick={() => start({ recipeId, stepId, label, minutes: timer.minutes })}
         aria-label={`Avvia timer ${label}, ${formatDuration(timer.minutes)}`}
       >

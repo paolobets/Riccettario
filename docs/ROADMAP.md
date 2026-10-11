@@ -20,35 +20,31 @@
 - "Trovami la ricetta": in Importa la sorgente "Piatto" fa scrivere all'AI la ricetta di un piatto per nome, con la stessa struttura e revisione nel wizard delle altre sorgenti; raggiungibile anche da "Cosa preparo?" con `?piatto=`.
 - Backend su Cloudflare Pages con D1: utenti con password personale creati dall'amministratore, budget per persona e tetto giornaliero, una riga di consumo per richiesta con la funzione, sincronizzazione dell'archivio tra dispositivi (ultima modifica vince, lapidi per le cancellazioni, cursori separati per invio e ricezione), rotte admin; guida in `docs/CLOUDFLARE.md`, messaggio per i tester in `docs/BENVENUTO-TESTER.md`.
 - Accesso solido per l'uso pubblico: registrazione con email e password su invito (`/registrati?invito=`), accesso, sessioni per dispositivo con elenco e revoca in Impostazioni, cambio password, reset via email (Resend) o link dell'amministratore, blocco dopo cinque tentativi, ruolo amministratore via sessione; il token di sessione prende il posto della password nell'app, il resto non cambia. Variabile `OPEN_SIGNUP` per aprire la registrazione a tutti. Provato in Node (68 controlli) e nel browser su due dispositivi.
+- Lista della spesa (`/spesa`): più ricette con le loro porzioni, ingredienti sommati per nome e unità (`src/core/shopping.ts`, testato), spunte, copia come testo; "Aggiungi alla spesa" dalla ricetta con il fattore corrente. Vive sul dispositivo.
+- Pronto per le 20:00: nella mise en place si sceglie l'ora del pasto e l'app calcola a ritroso quando iniziare, con gli orari di ogni passaggio (i paralleli non allungano) e una notifica all'ora di avvio finché l'app è aperta (`src/core/schedule.ts`, testato).
+- Riprendi la cottura: inizio, passo corrente e spunte in `localStorage` (scadono dopo un giorno); dalla ricetta "Riprendi dal passo 4" oppure "Ricomincia"; "Esci" non perde più il punto.
+- Scalatura per teglia: `Recipe.pan` (tonda o rettangolare) nel wizard; nel pannello Dosi la riga "Teglia" ricava il fattore dal rapporto tra le aree (`src/core/pan.ts`, testato).
+- Diario in lista: "Cucinata 3 volte, l'ultima il 3 ottobre"; ordinamento per più recenti, dalla A alla Z, più cucinate (ricordato sul dispositivo).
+- Controllo della ricetta nel riepilogo del wizard (`src/core/lint.ts`, testato): uova lineari, passaggi lunghi senza timer, riposi senza nulla in parallelo, ingredienti mai citati, passaggi vuoti o paralleli a nulla, base del panettiere mancante. Consigli, non blocchi.
+- Preferiti: stella nella ricetta, filtro "preferite" in lista. I tag fanno da raccolte.
+- Stampa e condivisione: foglio di stile di stampa (solo la ricetta, senza comandi), "Condividi" manda testo con le dosi riscalate e un link che contiene la ricetta (`/condivisa#r=…`): chi lo apre la vede e la salva come copia propria, anche senza account.
 - Riduzione dei costi AI: cache del prompt sul contesto delle conversazioni (1 h in cucina), sforzo di ragionamento per funzione (basso per domande e suggerimenti, medio per import e varianti), Haiku 5.5 per le domande in cucina (opzione), import da sito tramite JSON-LD con rotta `GET /fetch` nel proxy e lettura via AI solo come ripiego; prezzi di cache nel conteggio dei costi.
 
 ## Prossimi passi
 
-Funzionalità concordate il 10 ottobre 2026, in ordine di priorità. Ogni voce dice su cosa si appoggia, così lo sforzo resta stimabile.
+Le otto funzionalità concordate il 10 ottobre 2026 sono fatte (vedi sopra). Restano, in ordine di utilità:
 
-### 1. Lista della spesa
-Scegli più ricette con le loro porzioni; l'app somma gli ingredienti già riscalati (stessa unità base, stesso nome), li raggruppa per sezione o reparto, permette di spuntarli e di copiarli come testo. Si appoggia a `scaleRecipe` e `toBase`; nuova tabella `lists` in Dexie con le spunte. Sforzo medio.
+### 1. Foto del risultato
+A fine cottura una foto che resta nel diario e in lista. Serve uno spazio per i file (R2 su Cloudflare) e la sincronizzazione delle immagini: sforzo medio.
 
-### 2. Pronto per le 20:00
-Dato l'orario del pasto, la modalità cucina calcola a ritroso quando iniziare ogni passaggio usando durate, timer e passaggi paralleli, mostra la timeline e manda una notifica a ogni orario di avvio. Si appoggia a `totalDuration`, `parallelWith` e allo store dei timer. Sforzo medio.
+### 2. Raccolte
+Oltre ai tag, raccolte con un ordine proprio ("Natale", "Settimana prossima") e una pagina per ciascuna. Sforzo piccolo, dati nuovi da sincronizzare.
 
-### 3. Scalatura per teglia o stampo
-La resa può essere un diametro o una misura di teglia: cambiando la teglia il fattore è il rapporto tra le aree. Si innesta sul pivot della resa totale. Sforzo piccolo.
+### 3. Lista della spesa sincronizzata
+Oggi la lista vive sul dispositivo: portarla sul server come quarta tabella, così la si prepara al computer e la si legge al supermercato dal telefono. Sforzo piccolo (stessa logica di `sync`).
 
-### 4. Riprendi la cottura
-Se una cottura è rimasta aperta (passo in sessionStorage), il bottone della ricetta diventa "Riprendi dal passo 4". Sforzo piccolo.
-
-### 5. Diario più ricco
-"Cucinata 5 volte, ultima il 3 ottobre" in lista, ordinamento per frequenza, foto del risultato a fine cottura. Sforzo piccolo per i contatori, medio per le foto.
-
-### 6. Controllo della ricetta
-Avvisi nel riepilogo del wizard: passaggi lunghi senza timer, riposi senza passaggi paralleli, uova senza regola a pezzi interi, ingredienti mai citati (già c'è). Sforzo piccolo.
-
-### 7. Preferiti, ordinamento, raccolte
-Stella sulle ricette, ordine alfabetico o per frequenza, raccolte ("Natale", "Settimana"). Sforzo piccolo.
-
-### 8. Stampa e condivisione
-Vista di stampa pulita; condivisione come testo o come link che contiene la ricetta. Sforzo piccolo.
+### 4. Notifiche anche ad app chiusa
+"Pronto per le 20:00" avvisa finché l'app è aperta. Con le notifiche push del service worker avviserebbe anche da chiusa: serve una chiave VAPID e una rotta sul server. Sforzo medio.
 
 ### Già in programma
 - Conversione unità (tazze ↔ grammi per ingredienti noti).

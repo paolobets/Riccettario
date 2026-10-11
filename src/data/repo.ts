@@ -1,4 +1,4 @@
-import { db, type Chat, type CookSession } from './db'
+import { db, type Chat, type CookSession, type ShoppingList } from './db'
 import { sampleRecipes } from './samples'
 import type { Recipe } from '@/core'
 import { newId } from '@/core'
@@ -110,4 +110,38 @@ export async function importJson(text: string): Promise<number> {
   if (Array.isArray(data.chats)) await db.chats.bulkPut(data.chats)
   scheduleSync()
   return recipes.length
+}
+
+export async function toggleFavorite(recipe: Recipe): Promise<void> {
+  await saveRecipe({ ...recipe, favorite: !recipe.favorite })
+}
+
+// --- Lista della spesa (solo su questo dispositivo) -----------------------------
+
+export const SHOPPING_LIST_ID = 'current'
+
+async function loadList(): Promise<ShoppingList> {
+  return (await db.lists.get(SHOPPING_LIST_ID)) ?? { id: SHOPPING_LIST_ID, entries: [], checked: [], updatedAt: new Date().toISOString() }
+}
+
+/** Aggiunge una ricetta con il fattore corrente; se c'è già, aggiorna il fattore. */
+export async function addToShoppingList(recipeId: string, factor: number): Promise<void> {
+  const list = await loadList()
+  const entries = list.entries.filter((e) => e.recipeId !== recipeId)
+  entries.push({ recipeId, factor })
+  await db.lists.put({ ...list, entries, updatedAt: new Date().toISOString() })
+}
+
+export async function removeFromShoppingList(recipeId: string): Promise<void> {
+  const list = await loadList()
+  await db.lists.put({ ...list, entries: list.entries.filter((e) => e.recipeId !== recipeId), updatedAt: new Date().toISOString() })
+}
+
+export async function setShoppingChecked(checked: string[]): Promise<void> {
+  const list = await loadList()
+  await db.lists.put({ ...list, checked, updatedAt: new Date().toISOString() })
+}
+
+export async function clearShoppingList(): Promise<void> {
+  await db.lists.put({ id: SHOPPING_LIST_ID, entries: [], checked: [], updatedAt: new Date().toISOString() })
 }

@@ -1,17 +1,62 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
-import { activeDuration, formatDuration, totalDuration } from '@/core'
+import { activeDuration, formatDuration, totalDuration, type Recipe } from '@/core'
 import { HOSTED } from '@/ai/settings'
 import { useSignedIn } from '@/auth/session'
 import Icon from '../components/Icon'
 
+type Sort = 'recenti' | 'alfabetico' | 'cucinate'
+const SORT_KEY = 'lista:ordine'
+const SORT_LABELS: Record<Sort, string> = { recenti: 'Più recenti', alfabetico: 'Dalla A alla Z', cucinate: 'Più cucinate' }
+
+function loadSort(): Sort {
+  try {
+    const v = localStorage.getItem(SORT_KEY)
+    return v === 'alfabetico' || v === 'cucinate' ? v : 'recenti'
+  } catch {
+    return 'recenti'
+  }
+}
+
+interface Cooked {
+  count: number
+  last: string
+}
+
+function cookedLabel(c: Cooked | undefined): string | null {
+  if (!c) return null
+  const when = new Date(c.last).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })
+  return c.count === 1 ? `Cucinata una volta, il ${when}` : `Cucinata ${c.count} volte, l'ultima il ${when}`
+}
+
 export default function RecipeList() {
   const recipes = useLiveQuery(() => db.recipes.orderBy('updatedAt').reverse().toArray(), [])
+  const sessions = useLiveQuery(() => db.sessions.filter((s) => Boolean(s.finishedAt)).toArray(), [])
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
+  const [onlyFavorites, setOnlyFavorites] = useState(false)
+  const [sort, setSort] = useState<Sort>(() => loadSort())
   const signedIn = useSignedIn()
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_KEY, sort)
+    } catch {
+      // storage non disponibile
+    }
+  }, [sort])
+
+  const cooked = useMemo(() => {
+    const map = new Map<string, Cooked>()
+    for (const s of sessions ?? []) {
+      const prev = map.get(s.recipeId)
+      const last = s.finishedAt ?? s.startedAt
+      map.set(s.recipeId, { count: (prev?.count ?? 0) + 1, last: prev && prev.last > last ? prev.last : last })
+    }
+    return map
+  }, [sessions])
+  const hasFavorites = useMemo(() => recipes?.some((r) => r.favorite) ?? false, [recipes])
 
   const tags = useMemo(() => {
     const s = new Set<string>()
@@ -22,8 +67,9 @@ export default function RecipeList() {
   const filtered = useMemo(() => {
     if (!recipes) return []
     const q = query.trim().toLowerCase()
-    return recipes.filter((r) => {
+    const list = recipes.filter((r) => {
       if (tag && !r.tags.includes(tag)) return false
+      if (onlyFavorites && !r.favorite) return false
       if (!q) return true
       return (
         r.title.toLowerCase().includes(q) ||
@@ -31,10 +77,16 @@ export default function RecipeList() {
         r.tags.some((t) => t.toLowerCase().includes(q))
       )
     })
-  }, [recipes, query, tag])
+    const by: Record<Sort, (a: Recipe, b: Recipe) => number> = {
+      recenti: () => 0,
+      alfabetico: (a, b) => a.title.localeCompare(b.title, 'it'),
+      cucinate: (a, b) => (cooked.get(b.id)?.count ?? 0) - (cooked.get(a.id)?.count ?? 0) || (cooked.get(b.id)?.last ?? '').localeCompare(cooked.get(a.id)?.last ?? ''),
+    }
+    return sort === 'recenti' ? list : [...list].sort(by[sort])
+  }, [recipes, query, tag, onlyFavorites, sort, cooked])
 
   if (!recipes) return null
-  const filtering = query.trim() !== '' || tag !== null
+  const filtering = query.trim() !== '' || tag !== null || onlyFavorites
 
   return (
     <div className="space-y-4">
@@ -68,11 +120,16 @@ export default function RecipeList() {
           <Icon name="chef" size={18} /> Cosa preparo oggi?
         </Link>
       )}
-      {tags.length > 0 && (
+      {(tags.length > 0 || hasFavorites) && (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filtra per tag">
-          <button className={`chip-button ${tag === null ? 'bg-accent text-on-accent hover:bg-accent-strong' : ''}`} aria-pressed={tag === null} onClick={() => setTag(null)}>
+          <button className={`chip-button ${tag === null && !onlyFavorites ? 'bg-accent text-on-accent hover:bg-accent-strong' : ''}`} aria-pressed={tag === null && !onlyFavorites} onClick={() => { setTag(null); setOnlyFavorites(false) }}>
             tutte
           </button>
+          {hasFavorites && (
+            <button className={`chip-button ${onlyFavorites ? 'bg-accent text-on-accent hover:bg-accent-strong' : ''}`} aria-pressed={onlyFavorites} onClick={() => setOnlyFavorites(!onlyFavorites)}>
+              <Icon name="star" size={14} fill={onlyFavorites ? 'currentColor' : 'none'} /> preferite
+            </button>
+          )}
           {tags.map((t) => (
             <button
               key={t}
@@ -119,15 +176,31 @@ export default function RecipeList() {
         </div>
       )}
 
+      {recipes.length > 1 && (
+        <div className="flex items-center justify-end gap-2 text-sm text-muted">
+          <label htmlFor="ordine">Ordina</label>
+          <select id="ordine" className="min-h-9 py-1 text-sm" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+            {(Object.keys(SORT_LABELS) as Sort[]).map((k) => (
+              <option key={k} value={k}>
+                {SORT_LABELS[k]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <ul className="rule divide-y divide-line">
         {filtered.map((r) => {
+          const diary = cookedLabel(cooked.get(r.id))
           const total = totalDuration(r.steps)
           const active = activeDuration(r.steps)
           const waiting = total - active
           return (
             <li key={r.id}>
               <Link to={`/ricetta/${r.id}`} className="group -mx-2 block rounded-xl px-2 py-4">
-                <h2 className="font-display text-2xl font-medium text-fg group-hover:text-accent-text">{r.title}</h2>
+                <h2 className="font-display flex items-start gap-2 text-2xl font-medium text-fg group-hover:text-accent-text">
+                  {r.favorite && <Icon name="star" size={16} fill="currentColor" className="mt-2 text-warning" aria-label="Preferita" />}
+                  <span>{r.title}</span>
+                </h2>
                 {r.description && <p className="mt-1 line-clamp-2 text-sm text-muted">{r.description}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
                   <span className="inline-flex items-center gap-1">
@@ -144,6 +217,11 @@ export default function RecipeList() {
                       {t}
                     </span>
                   ))}
+                  {diary && (
+                    <span className="inline-flex items-center gap-1 basis-full">
+                      <Icon name="flame" size={14} /> {diary}
+                    </span>
+                  )}
                 </div>
               </Link>
             </li>

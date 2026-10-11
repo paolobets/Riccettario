@@ -39,13 +39,27 @@ Su pages.dev le ricette si sincronizzano tra i dispositivi in cui fai l'accesso.
 - [ ] Scrivi una nota su una ricetta; dopo qualche secondo "Sincronizza ora" riporta "1 inviata". Da un secondo dispositivo o da un altro browser, accedi con lo stesso account: le ricette e la nota compaiono.
 - [ ] Cancella una ricetta su un dispositivo: sull'altro sparisce alla prossima apertura.
 
+### 2c. Lista della spesa, teglia, preferiti (nessuna chiave)
+- [ ] Apri il Tiramisù: sotto il titolo c'è "teglia rettangolare 30×20 cm". In **Dosi → Teglia** scegli tonda, 24 cm, Applica: il fattore diventa ×0,75 (rapporto tra le aree) e le uova passano a 3.
+- [ ] Tocca la stella accanto al titolo: in lista compare il filtro "preferite".
+- [ ] "Aggiungi alla spesa" dal Tiramisù e dalla pizza con 8 porzioni; apri il carrello in alto: gli ingredienti sono sommati (la farina è 1 kg), spunta qualcosa, ricarica: le spunte restano. "Copia" mette la lista negli appunti.
+- [ ] In lista cambia "Ordina" in "Dalla A alla Z" e poi "Più cucinate": dopo una cottura conclusa la ricetta mostra "Cucinata una volta, il …".
+
+### 2d. Pronto per le 20:00 e Riprendi
+- [ ] Dalla pizza, "Cucina passo per passo": nella scheda **Pronto per le** scegli un orario tra qualche ora. Compare "Inizia alle …" con il totale; "Mostra gli orari dei passaggi" elenca ogni passo con la sua ora (i paralleli hanno la stessa ora del passo padre). Se l'orario è troppo vicino, l'avviso dice di quanto sei in ritardo.
+- [ ] Inizia, vai al passo 3, "Esci": la ricetta ora ha "Riprendi dal passo 3" e "Ricomincia". Chiudi e riapri l'app: c'è ancora. Dopo "Salva e chiudi" a fine cottura sparisce.
+
+### 2e. Condividi e stampa
+- [ ] In una ricetta con porzioni cambiate, "Condividi": sul telefono si apre il foglio di condivisione con il testo (dosi già riscalate) e un link; sul computer finisce negli appunti. Apri il link in un altro browser: la pagina "Ricetta condivisa con te" la salva come copia.
+- [ ] "Stampa" (o Ctrl+P): nell'anteprima ci sono solo titolo, ingredienti, passaggi e note, senza bottoni né barra.
+
 ### 3. Cosa preparo? (nessuna chiave)
 - [ ] Dalla lista, "Cosa preparo oggi?". Scegli "45 minuti" e scrivi "uova, pecorino": la proposta è la carbonara con "Hai già pecorino". "Un'altra" scorre le alternative.
 - [ ] Scegli "20 minuti": nessuna ricetta sta nel tempo; "Togli il limite di tempo" e "Fatti scrivere una ricetta" (porta a Importa → Piatto).
 
 ### 4. Wizard
 - [ ] "+ Nuova": inserisci titolo e porzioni, due ingredienti (uno "a pezzi interi"), un passaggio inserendo gli ingredienti con i bottoni sotto al testo.
-- [ ] Nel riepilogo controlla la "Prova di scalatura ×2", poi salva.
+- [ ] Metti un ingrediente "uova" con regola lineare e un passaggio di riposo da 30 minuti senza timer: nel riepilogo il **Controllo della ricetta** li segnala (si può salvare lo stesso). Controlla anche la "Prova di scalatura ×2", poi salva.
 
 ### 5. Assistente AI (serve la chiave)
 - [ ] Su pages.dev basta aver fatto l'accesso: in *Impostazioni → Account* c'è "Il tuo mese: … su 3,00 $". Su GitHub Pages incolla la chiave Anthropic in *Impostazioni → Assistente AI*, scegli il modello, salva.

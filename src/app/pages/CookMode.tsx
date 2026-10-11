@@ -3,8 +3,21 @@ import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { recordSession } from '@/data/repo'
-import { formatDuration, formatFactor, parallelStepsFor, quantifiedIngredientIdsInStep, renderStepPlain, STEP_TYPE_LABELS } from '@/core'
+import {
+  formatClock,
+  formatDuration,
+  formatFactor,
+  parallelStepsFor,
+  parseReadyAt,
+  planBackwards,
+  quantifiedIngredientIdsInStep,
+  renderStepPlain,
+  STEP_TYPE_LABELS,
+  upcomingStarts,
+  type Plan,
+} from '@/core'
 import { useScaler } from '../hooks/useScaler'
+import { clearCookState, cookStateKey, loadCookState, saveCookState, type CookState } from '../cook/state'
 import IngredientList from '../components/IngredientList'
 import StepText from '../components/StepText'
 import TimerButton from '../components/TimerButton'
@@ -36,26 +49,26 @@ function useWakeLock() {
   }, [])
 }
 
-/** Inizio della cottura corrente, in sessionStorage: sopravvive a un ricaricamento, non a una nuova scheda. */
-function storageKey(recipeId: string) {
-  return `cook:${recipeId}`
-}
-function loadStartedAt(recipeId: string): string | null {
+function notifyStart(title: string, body: string) {
   try {
-    return sessionStorage.getItem(storageKey(recipeId))
+    if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body, icon: `${import.meta.env.BASE_URL}icon.svg` })
   } catch {
-    return null
+    // niente notifiche
   }
 }
-function saveStartedAt(recipeId: string, value: string | null) {
-  try {
-    if (value === null) {
-      sessionStorage.removeItem(storageKey(recipeId))
-      sessionStorage.removeItem(`${storageKey(recipeId)}:spunte`)
-    } else sessionStorage.setItem(storageKey(recipeId), value)
-  } catch {
-    // storage non disponibile
-  }
+
+/** Avvisa quando è ora di iniziare un passaggio, finché la pagina resta aperta. */
+function useStartAlarms(plan: Plan | null, recipeTitle: string) {
+  useEffect(() => {
+    if (!plan) return
+    const now = new Date()
+    const timers = upcomingStarts(plan, now)
+      .filter((it) => it.startsAt.getTime() - now.getTime() < 12 * 3_600_000)
+      .map((it) =>
+        setTimeout(() => notifyStart(`È ora del passo ${it.index + 1}`, `${recipeTitle}: ${it.step.text.replace(/\{[^}]*\}/g, '…').slice(0, 80)}`), it.startsAt.getTime() - now.getTime()),
+      )
+    return () => timers.forEach(clearTimeout)
+  }, [plan, recipeTitle])
 }
 
 export default function CookMode() {
@@ -66,6 +79,8 @@ export default function CookMode() {
   const scaler = useScaler(recipe ?? undefined)
   const [rating, setRating] = useState(0)
   const [notes, setNotes] = useState('')
+  const [cook, setCook] = useState<CookState | null>(() => (id ? loadCookState(id) : null))
+  const [showPlan, setShowPlan] = useState(false)
   const { confirm, dialog } = useConfirm()
   useWakeLock()
 
@@ -91,6 +106,22 @@ export default function CookMode() {
     },
     [index, params, setParams, total],
   )
+
+  const updateCook = useCallback(
+    (patch: Partial<CookState>) => {
+      if (!id) return
+      const next: CookState = { startedAt: cook?.startedAt ?? new Date().toISOString(), ...cook, ...patch }
+      saveCookState(id, next)
+      setCook(next)
+    },
+    [cook, id],
+  )
+
+  // Il passo corrente si ricorda anche fuori dall'URL: così dalla ricetta si può riprendere.
+  useEffect(() => {
+    if (!id || index < 0 || index >= total || cook?.step === index) return
+    updateCook({ step: index })
+  }, [id, index, total, cook?.step, updateCook])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -119,6 +150,12 @@ export default function CookMode() {
       .filter((x): x is NonNullable<typeof x> => Boolean(x))
   }, [step, scaled])
 
+  // "Pronto per le": piano a ritroso, ricalcolato quando cambia l'orario.
+  const readyAtDate = useMemo(() => (cook?.readyAt ? parseReadyAt(cook.readyAt, new Date()) : null), [cook?.readyAt])
+  const plan = useMemo(() => (recipe && readyAtDate ? planBackwards(recipe.steps, readyAtDate) : null), [recipe, readyAtDate])
+  useStartAlarms(plan, recipe?.title ?? '')
+  const planned = plan && step ? plan.items.find((it) => it.step.id === step.id) : undefined
+
   if (recipe === undefined) return null
   if (recipe === null || !scaled) {
     return (
@@ -132,9 +169,10 @@ export default function CookMode() {
   const back = new URLSearchParams(params)
   back.delete('passo')
   const recipeLink = `/ricetta/${recipe.id}${back.size ? `?${back}` : ''}`
+  const late = plan ? Math.round((Date.now() - plan.startAt.getTime()) / 60_000) : 0
 
   const begin = () => {
-    if (!loadStartedAt(recipe.id)) saveStartedAt(recipe.id, new Date().toISOString())
+    if (!cook) updateCook({ startedAt: new Date().toISOString() })
     setIndex(0)
   }
 
@@ -142,21 +180,25 @@ export default function CookMode() {
     if (index >= 0 && !isEnd) {
       const ok = await confirm({
         title: 'Uscire dalla cottura?',
-        body: 'Riaprendola si riparte dalla preparazione degli ingredienti. I timer avviati continuano.',
+        body: `Potrai riprendere dal passo ${index + 1} dalla pagina della ricetta. I timer avviati continuano.`,
         confirmLabel: 'Esci',
         cancelLabel: 'Resta in cucina',
       })
       if (!ok) return
     }
-    saveStartedAt(recipe.id, null)
     navigate(recipeLink)
   }
 
   const finish = async () => {
-    const startedAt = loadStartedAt(recipe.id) ?? new Date().toISOString()
+    const startedAt = cook?.startedAt ?? new Date().toISOString()
     await recordSession(recipe.id, scaler.factor, startedAt, { rating: rating || undefined, notes: notes.trim() || undefined })
-    saveStartedAt(recipe.id, null)
+    clearCookState(recipe.id)
     navigate(recipeLink)
+  }
+
+  const setReadyAt = (value: string) => {
+    updateCook({ readyAt: value || undefined })
+    if (value && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => undefined)
   }
 
   return (
@@ -193,6 +235,11 @@ export default function CookMode() {
         {index < 0 && (
           <section className="space-y-4">
             <h1 className="text-2xl font-bold text-fg">Prima di iniziare</h1>
+            {cook?.step !== undefined && (
+              <button className="w-full min-h-11 rounded-lg bg-info-soft px-3 py-2 text-left text-sm text-info" onClick={() => setIndex(cook.step!)}>
+                <Icon name="play" size={14} className="mr-1 inline" /> Eri al passo {cook.step + 1}: tocca per riprendere da lì.
+              </button>
+            )}
             <p className="text-fg-2">Pesa e prepara tutto. Spunta man mano.</p>
             {scaled.warnings.map((w) => (
               <p key={w} className="notice flex items-start gap-2 bg-warning-soft text-warning">
@@ -200,7 +247,7 @@ export default function CookMode() {
               </p>
             ))}
             <div className="card">
-              <IngredientList scaled={scaled} checkable storageKey={`${storageKey(recipe.id)}:spunte`} />
+              <IngredientList scaled={scaled} checkable storageKey={`${cookStateKey(recipe.id)}:spunte`} />
             </div>
             {recipe.steps.some((s) => s.equipment?.length) && (
               <div className="rule pt-3">
@@ -210,6 +257,53 @@ export default function CookMode() {
                     <li key={e}>{e}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {recipe.steps.some((s) => (s.durationMin ?? 0) > 0 || s.timer) && (
+              <div className="card space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <label htmlFor="ready-at" className="section-title text-lg">
+                    Pronto per le
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input id="ready-at" type="time" className="py-1.5" value={cook?.readyAt ?? ''} onChange={(e) => setReadyAt(e.target.value)} />
+                    {cook?.readyAt && (
+                      <button className="btn-ghost min-h-9 px-2 py-1 text-sm" onClick={() => setReadyAt('')}>
+                        Togli
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {!plan && <p className="text-sm text-muted">Scegli l'ora del pasto: calcolo a ritroso quando iniziare ogni passaggio e ti avviso all'ora giusta finché l'app è aperta.</p>}
+                {plan && (
+                  <>
+                    <p className="text-fg">
+                      Inizia alle <b className="qty">{formatClock(plan.startAt)}</b>: {formatDuration(plan.totalMinutes)} in tutto, pause comprese.
+                    </p>
+                    {late > 0 && (
+                      <p className="notice flex items-start gap-2 bg-warning-soft text-warning">
+                        <Icon name="alert" size={16} className="mt-0.5" /> <span>Sei in ritardo di {formatDuration(late)} sull'orario di inizio: sarà pronto verso le {formatClock(new Date(Date.now() + plan.totalMinutes * 60_000))}.</span>
+                      </p>
+                    )}
+                    <button className="btn-ghost min-h-9 px-2 py-1 text-sm" onClick={() => setShowPlan(!showPlan)} aria-expanded={showPlan}>
+                      {showPlan ? 'Nascondi gli orari' : 'Mostra gli orari dei passaggi'}
+                    </button>
+                    {showPlan && (
+                      <ol className="divide-y divide-line text-sm">
+                        {plan.items.map((it) => (
+                          <li key={it.step.id} className="flex items-baseline gap-3 py-1.5">
+                            <span className="qty w-12 shrink-0 font-semibold text-fg">{formatClock(it.startsAt)}</span>
+                            <span className="min-w-0 flex-1 text-fg-2">
+                              <span className="text-muted">Passo {it.index + 1}</span> {renderStepPlain(it.step, scaled).slice(0, 70)}
+                              {it.parallel ? <span className="text-info"> (in parallelo)</span> : null}
+                            </span>
+                            {it.minutes > 0 && <span className="shrink-0 text-xs text-muted">{formatDuration(it.minutes)}</span>}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </section>
@@ -245,6 +339,11 @@ export default function CookMode() {
               {step.temperatureC && (
                 <span className="inline-flex items-center gap-1">
                   <Icon name="flame" size={13} /> {step.temperatureC} °C
+                </span>
+              )}
+              {planned && plan && (
+                <span className="inline-flex items-center gap-1" title={`Pronto per le ${formatClock(plan.readyAt)}`}>
+                  <Icon name="clock" size={13} /> inizio previsto {formatClock(planned.startsAt)}
                 </span>
               )}
             </div>
@@ -320,7 +419,7 @@ export default function CookMode() {
       <footer className="sticky bottom-0 flex gap-3 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur">
         {index < 0 ? (
           <button className="btn-primary flex-1 py-3 text-lg" onClick={begin}>
-            Inizia
+            {cook?.step !== undefined ? 'Ricomincia dal primo passo' : 'Inizia'}
           </button>
         ) : isEnd ? (
           <>

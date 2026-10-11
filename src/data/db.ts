@@ -20,6 +20,14 @@ export interface Chat {
   updatedAt: string
 }
 
+/** Lista della spesa: ricette scelte con il loro fattore e righe già prese. Vive solo su questo dispositivo. */
+export interface ShoppingList {
+  id: string
+  entries: Array<{ recipeId: string; factor: number }>
+  checked: string[]
+  updatedAt: string
+}
+
 export interface Setting {
   key: string
   value: unknown
@@ -30,6 +38,7 @@ class RicettarioDB extends Dexie {
   sessions!: EntityTable<CookSession, 'id'>
   settings!: EntityTable<Setting, 'key'>
   chats!: EntityTable<Chat, 'id'>
+  lists!: EntityTable<ShoppingList, 'id'>
   /** Cancellazioni da propagare agli altri dispositivi. */
   tombstones!: Dexie.Table<Tombstone, [string, string]>
 
@@ -52,6 +61,14 @@ class RicettarioDB extends Dexie {
       settings: 'key',
       chats: 'id, recipeId, updatedAt',
       tombstones: '[table+id], deletedAt',
+    })
+    this.version(4).stores({
+      recipes: 'id, title, updatedAt, *tags',
+      sessions: 'id, recipeId, startedAt',
+      settings: 'key',
+      chats: 'id, recipeId, updatedAt',
+      tombstones: '[table+id], deletedAt',
+      lists: 'id, updatedAt',
     })
   }
 }
