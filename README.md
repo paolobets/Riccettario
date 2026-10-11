@@ -65,7 +65,14 @@ Serve una chiave API Anthropic, da inserire in *Impostazioni → Assistente AI*.
 
 Chi preferisce non tenere la chiave nel browser può pubblicare `proxy/cloudflare-worker.js` su Cloudflare Workers (istruzioni nel file): l'app parla col proxy usando una password e il proxy aggiunge la vera chiave.
 
-Il codice dell'AI è in `src/ai/` e viene caricato solo quando serve, così il resto dell'app resta leggero e offline. Ogni risposta mostra il costo reale della richiesta (dai token riportati dall'API) e in *Impostazioni* c'è il totale speso. Le conversazioni restano salvate per ricetta e sono disponibili anche in modalità cucina, dove il bottone "Chiedi" passa all'AI il passaggio corrente.
+Il codice dell'AI è in `src/ai/` e viene caricato solo quando serve, così il resto dell'app resta leggero e offline. Ogni risposta mostra il costo reale della richiesta (dai token riportati dall'API, cache compresa) e in *Impostazioni* c'è il totale speso. Le conversazioni restano salvate per ricetta e sono disponibili anche in modalità cucina, dove il bottone "Chiedi" passa all'AI il passaggio corrente.
+
+Quattro accorgimenti tengono basso il conto senza togliere nulla:
+
+- **Cache del prompt**: ricetta e diario stanno in un blocco di sistema con `cache_control`; dalla seconda domanda si pagano a un decimo (un ventesimo su Opus 5.5). In cucina la cache dura un'ora, perché tra una domanda e l'altra passano anche venti minuti.
+- **Sforzo di ragionamento** esplicito per funzione: basso per domande e "Cosa preparo?", medio per import, piatto e varianti.
+- **Haiku 5.5 per le domande in cucina** (opzione attiva per default in *Impostazioni*): risposte brevi, costo quaranta volte più basso del modello principale.
+- **Import da sito senza lettura via AI**: l'app legge i dati strutturati schema.org/Recipe (JSON-LD) della pagina e passa all'AI solo il testo della ricetta, 1-2k token invece dei 10-30k di una pagina intera. Il browser non può scaricare pagine di altri siti, quindi serve il proxy (rotta `GET /fetch`); senza proxy, o se la pagina non espone i dati, l'AI legge la pagina con `web_fetch` come prima.
 
 ## Aspetto
 

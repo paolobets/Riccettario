@@ -4,6 +4,8 @@ import { getClient } from './client'
 import { aiRecipeSchema, aiToRecipe, type ConversionResult } from './schema'
 import { SYSTEM_DISH, SYSTEM_IMPORT } from './prompts'
 import { recordUsage } from './usage'
+import { fetchPageHtml } from './page'
+import { recipeTextFromHtml } from './jsonld'
 
 export interface ImportInput {
   text?: string
@@ -44,7 +46,23 @@ export async function importRecipe(input: ImportInput, onStatus?: (s: string) =>
     for (const f of input.images) content.push(await fileToImageBlock(f))
   }
   const parts: string[] = []
-  if (input.url?.trim()) parts.push(`Ricetta da questa pagina: ${input.url.trim()}\nLeggi la pagina e trascrivi la ricetta.`)
+  // Da un sito: prima i dati strutturati della pagina (JSON-LD), che costano 1-2k token;
+  // solo se mancano l'AI legge la pagina intera con web_fetch (10-30k token).
+  let needsWebFetch = false
+  const url = input.url?.trim()
+  if (url) {
+    onStatus?.('Leggo la pagina…')
+    const html = await fetchPageHtml(url, settings)
+    const found = html ? recipeTextFromHtml(html, url) : null
+    if (found) {
+      onStatus?.(`Trovata «${found.title}», la strutturo…`)
+      parts.push(`Testo della ricetta (dai dati strutturati della pagina ${url}):\n\n${found.text}`)
+    } else {
+      needsWebFetch = true
+      onStatus?.('La pagina non espone i dati della ricetta: la faccio leggere all\'AI…')
+      parts.push(`Ricetta da questa pagina: ${url}\nLeggi la pagina e trascrivi la ricetta.`)
+    }
+  }
   if (input.text?.trim()) parts.push(`Testo della ricetta:\n\n${input.text.trim()}`)
   if (input.images?.length) parts.push('Trascrivi la ricetta fotografata nelle immagini.')
   if (input.dish?.trim()) parts.push(`Scrivi la ricetta di: ${input.dish.trim()}`)
@@ -57,8 +75,8 @@ export async function importRecipe(input: ImportInput, onStatus?: (s: string) =>
     max_tokens: 16000,
     system: input.dish?.trim() ? SYSTEM_DISH : SYSTEM_IMPORT,
     messages: [{ role: 'user', content }],
-    output_config: { format: zodOutputFormat(aiRecipeSchema) },
-    ...(input.url?.trim() ? { tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 3 }] } : {}),
+    output_config: { format: zodOutputFormat(aiRecipeSchema), effort: 'medium' },
+    ...(needsWebFetch ? { tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 2, max_content_tokens: 15000 }] } : {}),
   })
   if (response.stop_reason === 'refusal') throw new Error('Il servizio AI ha rifiutato la richiesta.')
   if (response.stop_reason === 'max_tokens') throw new Error('Risposta troppo lunga: prova con una ricetta più breve.')

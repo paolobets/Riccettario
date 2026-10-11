@@ -8,7 +8,7 @@ import Icon from '../components/Icon'
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const [ai, setAi] = useState<AiSettings>({ apiKey: '', proxyUrl: '', model: DEFAULT_MODEL })
+  const [ai, setAi] = useState<AiSettings>({ apiKey: '', proxyUrl: '', model: DEFAULT_MODEL, fastKitchenAnswers: true })
   const [aiSaved, setAiSaved] = useState(false)
   const [showKey, setShowKey] = useState(false)
   const [usage, setUsage] = useState<UsageTotals | null>(null)
@@ -101,10 +101,25 @@ export default function Settings() {
             ))}
           </select>
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-5 w-5 accent-accent"
+            checked={ai.fastKitchenAnswers}
+            onChange={(e) => {
+              setAi({ ...ai, fastKitchenAnswers: e.target.checked })
+              setAiSaved(false)
+            }}
+          />
+          <span>
+            <span className="font-medium text-fg-2">Risposte veloci in cucina</span>
+            <span className="block text-muted">Le domande fatte durante la cottura usano Claude Haiku 5.5: risposte brevi, costo quaranta volte più basso.</span>
+          </span>
+        </label>
         <details className="text-sm">
           <summary className="cursor-pointer text-fg-2">Opzionale: proxy per non tenere la chiave nel browser</summary>
           <p className="mt-2 text-muted">
-            Pubblica <code>proxy/cloudflare-worker.js</code> (istruzioni nel file), poi inserisci qui l'URL del worker e, nel campo chiave, la password del proxy.
+            Pubblica <code>proxy/cloudflare-worker.js</code> (istruzioni nel file), poi inserisci qui l'URL del worker e, nel campo chiave, la password del proxy. Con il proxy l'import da sito legge i dati della pagina senza passare dall'AI, quando il sito li espone.
           </p>
           <input className="mt-2 w-full" type="url" placeholder="https://ricettario-proxy.xxx.workers.dev" aria-label="Indirizzo del proxy" value={ai.proxyUrl} onChange={(e) => { setAi({ ...ai, proxyUrl: e.target.value }); setAiSaved(false) }} />
         </details>

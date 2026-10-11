@@ -11,7 +11,12 @@ export interface AiSettings {
   apiKey: string
   proxyUrl: string
   model: string
+  /** Domande in modalità cucina con Haiku 5.5: risposte brevi, costo quaranta volte più basso di Opus. */
+  fastKitchenAnswers: boolean
 }
+
+/** Modello usato per le domande in cucina quando `fastKitchenAnswers` è attivo. */
+export const KITCHEN_MODEL = 'claude-haiku-5-5'
 
 export const DEFAULT_MODEL = 'claude-opus-5-5'
 export const MODELS: Array<{ id: string; label: string }> = [
@@ -25,7 +30,7 @@ const KEY = 'ai'
 export async function loadAiSettings(): Promise<AiSettings> {
   const row = await db.settings.get(KEY)
   const v = (row?.value ?? {}) as Partial<AiSettings>
-  return { apiKey: v.apiKey ?? '', proxyUrl: v.proxyUrl ?? '', model: v.model ?? DEFAULT_MODEL }
+  return { apiKey: v.apiKey ?? '', proxyUrl: v.proxyUrl ?? '', model: v.model ?? DEFAULT_MODEL, fastKitchenAnswers: v.fastKitchenAnswers ?? true }
 }
 
 export async function saveAiSettings(s: AiSettings): Promise<void> {

@@ -40,7 +40,7 @@ export async function suggestDish(p: SuggestParams): Promise<AiSuggestion & { co
     max_tokens: 1500,
     system: SYSTEM_SUGGEST,
     messages: [{ role: 'user', content }],
-    output_config: { format: zodOutputFormat(aiSuggestionSchema) },
+    output_config: { format: zodOutputFormat(aiSuggestionSchema), effort: 'low' },
   })
   if (response.stop_reason === 'refusal') throw new Error('Il servizio AI ha rifiutato la richiesta.')
   if (!response.parsed_output) throw new Error('Risposta dell\'AI non interpretabile. Riprova.')

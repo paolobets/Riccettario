@@ -38,11 +38,12 @@ Le ricette vivono nel browser del dispositivo: telefono e computer hanno archivi
 - [ ] *Impostazioni → Assistente AI*: incolla la chiave Anthropic, scegli il modello, salva.
 - [ ] *Importa → Testo*: incolla una ricetta qualsiasi (anche presa da un sito). Controlla nel riepilogo ingredienti, regole di scalatura e passaggi, poi salva. Sotto il banner c'è il costo della richiesta.
 - [ ] *Importa → Foto*: fotografa una pagina di un libro di ricette.
-- [ ] *Importa → Sito*: incolla l'URL di una ricetta. Questo è il percorso meno collaudato: se fallisce, segnalalo con l'URL usato.
+- [ ] *Importa → Sito*: incolla l'URL di una ricetta (Giallozafferano, Cucchiaio d'argento, un blog). Con il proxy configurato lo stato dice «Trovata "…", la strutturo»: la pagina è stata letta dai dati strutturati, costo di pochi centesimi. Senza proxy, o se la pagina non li espone, lo stato dice che la fa leggere all'AI. Se fallisce, segnalalo con l'URL usato.
+- [ ] Fai due domande di seguito sulla stessa ricetta: la seconda costa visibilmente meno della prima (cache del contesto).
 - [ ] *Importa → Piatto*: scrivi "vitello tonnato per 6" e "Scrivi la ricetta": nel riepilogo controlla dosi, regole e passaggi; la fonte dice che l'ha scritta l'assistente.
 - [ ] *Cosa preparo?* → "Chiedi all'AI": propone una tua ricetta con il perché, oppure un piatto nuovo con "Scrivi la ricetta" che apre Importa già compilato.
 - [ ] In una ricetta apri l'assistente e fai una domanda rapida. Ricarica la pagina: la conversazione è ancora lì.
-- [ ] In modalità cucina, "Chiedi" su un passaggio.
+- [ ] In modalità cucina, "Chiedi" su un passaggio: con "Risposte veloci in cucina" attivo la risposta arriva da Haiku e costa meno di un centesimo.
 - [ ] Scheda "Variante": scrivi un'istruzione, crea la variante, controlla che si apra come nuova ricetta.
 - [ ] *Impostazioni*: la "Spesa stimata finora" riporta le richieste fatte.
 
