@@ -12,7 +12,13 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api", "/api/*"]
   },
-  // Il database D1 si aggiunge qui appena creato (binding "DB"): senza, l'app funziona ma senza accessi, budget e sincronizzazione.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ricettario",
+      "database_id": "6feda3f8-086a-4dc3-8db2-6a114d36d320"
+    }
+  ],
   "vars": {
     "MONTHLY_BUDGET_USD": "3",
     "DAILY_BUDGET_USD": "5"
