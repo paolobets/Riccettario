@@ -20,9 +20,5 @@ jobs:
             echo "--- pagina principale"
             html=$(curl -sS -m 20 "$u/" || true)
             echo "$html" | head -c 300; echo
-            js=$(echo "$html" | grep -o 'assets/index-[^"]*\.js' | head -1)
-            echo "bundle: ${js:-nessuno}"
-            if [ -n "$js" ]; then
-              if curl -sS -m 20 "$u/$js" | grep -q 'new URL(`/api`'; then echo "backend integrato: SI"; else echo "backend integrato: NO"; fi
-            fi
+            echo "backend dichiarato nell'HTML: $(echo "$html" | grep -o 'name="ricettario-backend" content="[^"]*"' | head -1 || echo 'nessuno (build vecchia)')"
           done

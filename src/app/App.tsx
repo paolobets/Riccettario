@@ -20,6 +20,7 @@ import SharedPage from './pages/SharedPage'
 import ComposePage from './pages/ComposePage'
 import SplitPage from './pages/SplitPage'
 import LabelPage from './pages/LabelPage'
+import AdminPage from './pages/AdminPage'
 
 export default function App() {
   const [ready, setReady] = useState(false)
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="cosa-preparo" element={<SuggestPage />} />
         <Route path="spesa" element={<ShoppingPage />} />
         <Route path="condivisa" element={<SharedPage />} />
+        <Route path="amministrazione" element={<AdminPage />} />
         <Route path="accedi" element={<LoginPage />} />
         <Route path="registrati" element={<RegisterPage />} />
         <Route path="password-dimenticata" element={<ForgotPage />} />

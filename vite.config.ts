@@ -9,6 +9,10 @@ import { APP_DESCRIPTION, APP_NAME, BACKGROUND_COLOR, THEME_COLOR } from './src/
 function spaFallback() {
   return {
     name: 'spa-fallback-404',
+    // Scrive nell'HTML dove sta il backend: utile per controllare un deploy guardando il sorgente.
+    transformIndexHtml(html: string) {
+      return html.replace('</head>', `    <meta name="ricettario-backend" content="${process.env.VITE_DEFAULT_PROXY ?? ''}" />\n  </head>`)
+    },
     async writeBundle(options: { dir?: string }) {
       const { copyFile } = await import('node:fs/promises')
       const dir = options.dir ?? 'dist'

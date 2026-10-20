@@ -52,6 +52,12 @@ export default function AccountSection({ account, onChange }: Props) {
             Crea l'account
           </Link>
         </div>
+        <p className="text-xs text-muted">
+          Gestisci l'app?{' '}
+          <Link to="/amministrazione" className="text-accent-text underline-offset-2 hover:underline">
+            Amministrazione
+          </Link>
+        </p>
       </section>
     )
   }
@@ -187,6 +193,13 @@ export default function AccountSection({ account, onChange }: Props) {
           <p className="text-xs text-muted">Se non riconosci un dispositivo, scollegalo e cambia la password.</p>
         </div>
       )}
+      <p className="text-xs text-muted">
+        Gestisci l'app?{' '}
+        <Link to="/amministrazione" className="text-accent-text underline-offset-2 hover:underline">
+          Amministrazione
+        </Link>
+        : inviti, persone e consumi.
+      </p>
       {changing && (
         <form className="space-y-3" onSubmit={submitPassword}>
           <PasswordField label="Password attuale" value={current} onChange={setCurrent} autoComplete="current-password" />
