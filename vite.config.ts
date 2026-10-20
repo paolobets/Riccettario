@@ -23,8 +23,9 @@ function spaFallback() {
  * cruscotto non c'è nulla da impostare. Altrove (GitHub Pages, locale) resta vuoto, salvo
  * VITE_DEFAULT_PROXY esplicita.
  */
-const onCloudflare = Boolean(process.env.WORKERS_CI || process.env.CF_PAGES)
+const onCloudflare = Boolean(process.env.WORKERS_CI || process.env.CF_PAGES || process.env.CLOUDFLARE_ACCOUNT_ID)
 if (process.env.VITE_DEFAULT_PROXY === undefined && onCloudflare) process.env.VITE_DEFAULT_PROXY = '/api'
+console.log(`[ricettario] backend per l'app: ${process.env.VITE_DEFAULT_PROXY || '(nessuno: chiave personale)'}${onCloudflare ? ', build su Cloudflare' : ''}`)
 
 export default defineConfig({
   plugins: [
