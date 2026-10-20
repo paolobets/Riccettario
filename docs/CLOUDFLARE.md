@@ -27,7 +27,7 @@ Nel Worker, scheda **Domini**: se l'indirizzo `workers.dev` è spento, abilitalo
 Scheda **Impostazioni**, due blocchi diversi:
 
 - **Variabili e segreti** (per il backend), tipo **Segreto**: `ANTHROPIC_API_KEY` (la chiave `sk-ant-…`) e `ADMIN_TOKEN` (una password lunga solo tua, per i comandi da terminale). Facoltativi: `OPEN_SIGNUP`, `RESEND_API_KEY`, `MAIL_FROM`, `APP_ORIGIN` (vedi la tabella più sotto). `MONTHLY_BUDGET_USD` e `DAILY_BUDGET_USD` sono già nel file.
-- **Build → Variabili e segreti di build**: `VITE_DEFAULT_PROXY` = `/api`. Dice all'app compilata che il backend sta sullo stesso indirizzo. Dopo averla aggiunta serve una nuova build: **Distribuzioni → Riprova**, o un push.
+- Niente da impostare per la build: su Cloudflare l'app compilata usa da sola il backend su `/api` (lo capisce dalle variabili della build, vedi `vite.config.ts`). `VITE_DEFAULT_PROXY` nelle variabili di build serve solo per puntare altrove.
 
 I segreti del backend si possono aggiungere anche dopo, senza rifare la build. Senza `ANTHROPIC_API_KEY` tutto funziona tranne l'assistente.
 

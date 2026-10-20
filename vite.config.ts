@@ -17,6 +17,15 @@ function spaFallback() {
   }
 }
 
+/**
+ * Dove sta il backend per l'app compilata. Su Cloudflare (Workers Builds o Pages) è sempre
+ * sullo stesso indirizzo, sotto /api: lo si deduce dalle variabili della build, così nel
+ * cruscotto non c'è nulla da impostare. Altrove (GitHub Pages, locale) resta vuoto, salvo
+ * VITE_DEFAULT_PROXY esplicita.
+ */
+const onCloudflare = Boolean(process.env.WORKERS_CI || process.env.CF_PAGES)
+if (process.env.VITE_DEFAULT_PROXY === undefined && onCloudflare) process.env.VITE_DEFAULT_PROXY = '/api'
+
 export default defineConfig({
   plugins: [
     spaFallback(),
