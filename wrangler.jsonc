@@ -5,7 +5,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ricettario",
   "main": "worker.js",
-  "compatibility_date": "2026-10-01",
+  "compatibility_date": "2025-09-01",
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
