@@ -1,0 +1,28 @@
+# Controlla da GitHub che l'app pubblicata su Cloudflare risponda: /api/health e
+# bundle con il backend integrato. Si lancia a mano (Actions → Controllo deploy → Run)
+# o a ogni modifica di questo file. Non tocca nulla: solo letture.
+name: Controllo deploy
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ['.github/workflows/controllo-deploy.yml']
+jobs:
+  controllo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Interroga gli indirizzi pubblicati
+        run: |
+          for u in https://ha-betarena.it https://ricettario.ha-betarena.it https://riccettario.paolo-bets.workers.dev https://ricettario.paolo-bets.workers.dev; do
+            echo "=================== $u"
+            echo "--- /api/health"
+            curl -sS -m 20 -w '\n[HTTP %{http_code}]\n' "$u/api/health" || echo "(non raggiungibile)"
+            echo "--- pagina principale"
+            html=$(curl -sS -m 20 "$u/" || true)
+            echo "$html" | head -c 300; echo
+            js=$(echo "$html" | grep -o 'assets/index-[^"]*\.js' | head -1)
+            echo "bundle: ${js:-nessuno}"
+            if [ -n "$js" ]; then
+              if curl -sS -m 20 "$u/$js" | grep -q 'new URL(`/api`'; then echo "backend integrato: SI"; else echo "backend integrato: NO"; fi
+            fi
+          done
