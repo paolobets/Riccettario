@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
+import { loadSamples } from '@/data/repo'
 import { activeDuration, formatDuration, totalDuration, type Recipe } from '@/core'
 import { HOSTED } from '@/ai/settings'
 import { useSignedIn } from '@/auth/session'
@@ -173,6 +174,9 @@ export default function RecipeList() {
               <Icon name="sparkles" size={16} /> Importa con l'AI
             </Link>
           </div>
+          <button className="btn-ghost mt-3 text-sm" onClick={() => loadSamples()}>
+            Carica tre ricette di esempio (pizza, carbonara, tiramisù)
+          </button>
         </div>
       )}
 

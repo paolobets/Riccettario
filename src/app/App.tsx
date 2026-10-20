@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { seedIfEmpty } from '@/data/repo'
+import { HOSTED } from '@/ai/settings'
 import { startSync } from '@/data/sync'
 import Layout from './components/Layout'
 import RecipeList from './pages/RecipeList'
@@ -27,7 +28,8 @@ export default function App() {
   const [ready, setReady] = useState(false)
   useEffect(() => {
     let stop: (() => void) | undefined
-    seedIfEmpty().finally(() => {
+    // Con il backend l'archivio arriva dal server: niente esempi non richiesti nell'account.
+    ;(HOSTED ? Promise.resolve() : seedIfEmpty()).finally(() => {
       setReady(true)
       stop = startSync()
     })

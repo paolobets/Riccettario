@@ -6,13 +6,22 @@ import { scheduleSync } from './sync'
 
 const SEEDED_KEY = 'seeded'
 
-/** Alla prima apertura carica le ricette di esempio. */
+/** Alla prima apertura senza backend carica le ricette di esempio. Con il backend si caricano a richiesta. */
 export async function seedIfEmpty(): Promise<void> {
   const seeded = await db.settings.get(SEEDED_KEY)
   if (seeded) return
   const count = await db.recipes.count()
   if (count === 0) await db.recipes.bulkPut(sampleRecipes)
   await db.settings.put({ key: SEEDED_KEY, value: true })
+}
+
+/** Carica le tre ricette di esempio adesso (contano come modificate ora, così arrivano anche al server). */
+export async function loadSamples(): Promise<number> {
+  const now = new Date().toISOString()
+  await db.recipes.bulkPut(sampleRecipes.map((r) => ({ ...r, createdAt: now, updatedAt: now })))
+  await db.settings.put({ key: SEEDED_KEY, value: true })
+  scheduleSync()
+  return sampleRecipes.length
 }
 
 export async function saveRecipe(recipe: Recipe): Promise<Recipe> {
