@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { login } from '@/auth/session'
+import { login, useSignedIn } from '@/auth/session'
+import { Navigate } from 'react-router'
 import AuthShell from '../../components/AuthShell'
 import PasswordField from '../../components/PasswordField'
 
@@ -12,6 +13,8 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const next = params.get('next') || '/'
+  const signedIn = useSignedIn()
+  if (signedIn) return <Navigate to={next} replace />
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -34,7 +37,7 @@ export default function LoginPage() {
   return (
     <AuthShell
       title="Accedi"
-      intro="Con l'accesso ritrovi le tue ricette su ogni dispositivo e puoi usare l'assistente."
+      intro="Il ricettario è riservato a chi ha un account: con l'accesso ritrovi le tue ricette su ogni dispositivo e puoi usare l'assistente."
       error={error}
       onSubmit={submit}
       footer={

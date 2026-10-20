@@ -29,7 +29,7 @@ Grazie!
 
 ## Promemoria per chi gestisce
 
-- Invito nuovo: `curl -X POST -H "x-admin-token: …" -H "content-type: application/json" -d '{"email":"anna@esempio.it"}' https://ricettario.pages.dev/api/admin/invites`; il `link` nella risposta va nel messaggio. Senza email l'invito vale per chiunque lo apra.
+- Invito nuovo, senza terminale: nell'app, *Impostazioni → Amministrazione* → **Crea invito** → **Manda l'invito**. Da terminale: `curl -X POST -H "x-admin-token: …" -H "content-type: application/json" -d '{"email":"anna@esempio.it"}' https://ricettario.pages.dev/api/admin/invites`; il `link` nella risposta va nel messaggio. Senza email l'invito vale per chiunque lo apra.
 - Consumi di tutti: `curl -H "x-admin-token: …" https://ricettario.pages.dev/api/admin/usage`.
 - Budget predefinito 3 $ a persona al mese e 5 $ al giorno per tutti: con le riduzioni attive bastano per un uso normale; si alzano con `MONTHLY_BUDGET_USD` e `DAILY_BUDGET_USD`, o per persona con `"budgetUsd"` nell'invito.
 - Password persa (senza email configurata): `curl -X POST -H "x-admin-token: …" …/api/admin/users/anna/reset-link` dà un link che vale un'ora. Per sospendere: `…/disable`.

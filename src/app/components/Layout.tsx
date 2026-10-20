@@ -2,8 +2,12 @@ import { Link, NavLink, Outlet } from 'react-router'
 import { APP_NAME } from '../branding'
 import TimerBar from './TimerBar'
 import Icon from './Icon'
+import { HOSTED } from '@/ai/settings'
+import { useSignedIn } from '@/auth/session'
 
 export default function Layout() {
+  const signedIn = useSignedIn()
+  const locked = HOSTED && signedIn === false
   const nav = ({ isActive }: { isActive: boolean }) => `btn-ghost min-h-10 min-w-10 px-2 py-1.5 text-sm ${isActive ? 'bg-accent-soft' : ''}`
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col">
@@ -12,6 +16,7 @@ export default function Layout() {
           <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" className="h-7 w-7 rounded-lg" />
           {APP_NAME}
         </Link>
+        {!locked && (
         <nav className="flex items-center gap-1">
           <NavLink to="/spesa" className={nav} aria-label="Lista della spesa">
             <Icon name="cart" size={18} />
@@ -28,6 +33,7 @@ export default function Layout() {
             <Icon name="settings" size={18} />
           </NavLink>
         </nav>
+        )}
       </header>
       <div className="print:hidden">
         <TimerBar />

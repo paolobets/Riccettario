@@ -21,6 +21,7 @@ import ComposePage from './pages/ComposePage'
 import SplitPage from './pages/SplitPage'
 import LabelPage from './pages/LabelPage'
 import AdminPage from './pages/AdminPage'
+import RequireAuth from './components/RequireAuth'
 
 export default function App() {
   const [ready, setReady] = useState(false)
@@ -36,26 +37,30 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<RecipeList />} />
-        <Route path="ricetta/nuova" element={<RecipeWizard />} />
-        <Route path="ricetta/:id" element={<RecipeView />} />
-        <Route path="ricetta/:id/modifica" element={<RecipeWizard />} />
-        <Route path="ricetta/:id/scomponi" element={<SplitPage />} />
-        <Route path="ricetta/:id/etichetta" element={<LabelPage />} />
-        <Route path="componi" element={<ComposePage />} />
-        <Route path="impostazioni" element={<Settings />} />
-        <Route path="importa" element={<ImportPage />} />
-        <Route path="cosa-preparo" element={<SuggestPage />} />
-        <Route path="spesa" element={<ShoppingPage />} />
+        <Route element={<RequireAuth />}>
+          <Route index element={<RecipeList />} />
+          <Route path="ricetta/nuova" element={<RecipeWizard />} />
+          <Route path="ricetta/:id" element={<RecipeView />} />
+          <Route path="ricetta/:id/modifica" element={<RecipeWizard />} />
+          <Route path="ricetta/:id/scomponi" element={<SplitPage />} />
+          <Route path="ricetta/:id/etichetta" element={<LabelPage />} />
+          <Route path="componi" element={<ComposePage />} />
+          <Route path="impostazioni" element={<Settings />} />
+          <Route path="importa" element={<ImportPage />} />
+          <Route path="cosa-preparo" element={<SuggestPage />} />
+          <Route path="spesa" element={<ShoppingPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
         <Route path="condivisa" element={<SharedPage />} />
         <Route path="amministrazione" element={<AdminPage />} />
         <Route path="accedi" element={<LoginPage />} />
         <Route path="registrati" element={<RegisterPage />} />
         <Route path="password-dimenticata" element={<ForgotPage />} />
         <Route path="reimposta" element={<ResetPage />} />
-        <Route path="*" element={<NotFound />} />
       </Route>
-      <Route path="ricetta/:id/cucina" element={<CookMode />} />
+      <Route element={<RequireAuth />}>
+        <Route path="ricetta/:id/cucina" element={<CookMode />} />
+      </Route>
     </Routes>
   )
 }

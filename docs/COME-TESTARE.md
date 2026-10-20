@@ -26,13 +26,14 @@ Su pages.dev le ricette si sincronizzano tra i dispositivi in cui fai l'accesso.
 - [ ] "Esci" chiede conferma; "Resta in cucina" non perde nulla.
 - [ ] Arriva in fondo, dai un voto e una nota, salva: compaiono nel "Diario di cottura" della ricetta. Una cottura abbandonata con "Esci" non compare.
 
-### 2a. Accesso (su pages.dev)
-- [ ] Apri il link d'invito: la pagina dice "Invito valido per la tua email". Prova una password di 5 caratteri: viene rifiutata con la spiegazione. Scegline una lunga e crea l'account: la lista non mostra più l'avviso "Accedi per usare l'assistente".
+### 2a. Accesso (sull'indirizzo con il backend)
+- [ ] Senza account l'app mostra solo la pagina **Accedi**: qualsiasi indirizzo (anche una ricetta) ci riporta, e dopo l'accesso si torna dove si voleva andare. Il menu compare solo da collegati.
+- [ ] Apri il link d'invito: la pagina dice "Invito valido per la tua email". Prova una password di 5 caratteri: viene rifiutata con la spiegazione. Scegline una lunga e crea l'account: si entra nella lista.
 - [ ] *Impostazioni → Account*: c'è la tua email, "Il tuo mese", e in "Dispositivi collegati" questo dispositivo.
 - [ ] Da un altro browser o dal computer, *Accedi* con email e password sbagliata: "Email o password non corretti". Con quella giusta entri; in "Dispositivi collegati" ora sono due. Scollega il primo: su quello, alla prossima apertura, torna l'avviso di accesso.
 - [ ] "Cambia password" con la vecchia sbagliata viene rifiutato; con quella giusta va a buon fine e gli altri dispositivi vengono scollegati.
 - [ ] "Password dimenticata" dalla pagina di accesso: se le email non sono configurate lo dice; chiedi il link di reset a chi gestisce, aprilo, scegli la nuova password: sei dentro.
-- [ ] "Esci": le ricette restano sul telefono, l'assistente chiede di accedere.
+- [ ] "Esci": l'app sincronizza, poi toglie ricette, diario e lista della spesa dal telefono e torna all'accesso. Rientrando, tutto torna dal server (se il server non risponde, l'uscita chiede conferma perché si perderebbero le modifiche non inviate).
 
 ### 2b. Sincronizzazione (su pages.dev, dopo l'accesso)
 - [ ] In *Impostazioni* la sezione "Sincronizzazione" mostra l'ultima ora e il numero di ricette sul server.

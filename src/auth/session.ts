@@ -7,7 +7,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { loadAiSettings, saveAiSettings } from '@/ai/settings'
-import { resetSyncCursor, syncNow } from '@/data/sync'
+import { getSyncStatus, resetSyncCursor, syncNow } from '@/data/sync'
 
 export interface SessionUser {
   name: string
@@ -141,8 +141,21 @@ export function logoutOthers(): Promise<{ ok: boolean }> {
   return call('/auth/logout-all', { method: 'POST', auth: true })
 }
 
-/** Chiude la sessione sul server (se raggiungibile) e dimentica il token. Le ricette restano sul dispositivo. */
-export async function logout(): Promise<void> {
+/**
+ * Prima di uscire manda al server quello che manca. `false` se non ci è riuscita:
+ * chi chiama decide se uscire lo stesso (perdendo le modifiche non inviate).
+ */
+export async function syncBeforeLogout(): Promise<boolean> {
+  await syncNow()
+  return getSyncStatus().state !== 'error'
+}
+
+/**
+ * Chiude la sessione sul server (se raggiungibile), dimentica il token e, con
+ * `wipe`, toglie ricette, diario, conversazioni e lista della spesa dal
+ * dispositivo: restano sul server e tornano al prossimo accesso.
+ */
+export async function logout({ wipe = true }: { wipe?: boolean } = {}): Promise<void> {
   const s = await loadAiSettings()
   if (s.apiKey.startsWith(SESSION_PREFIX)) {
     try {
@@ -153,6 +166,11 @@ export async function logout(): Promise<void> {
   }
   await saveAiSettings({ ...s, apiKey: '' })
   await resetSyncCursor()
+  if (wipe) {
+    await db.transaction('rw', db.recipes, db.sessions, db.chats, db.tombstones, db.lists, async () => {
+      await Promise.all([db.recipes.clear(), db.sessions.clear(), db.chats.clear(), db.tombstones.clear(), db.lists.clear()])
+    })
+  }
 }
 
 /** Vero se c'è una chiave salvata (sessione o password tester); `undefined` finché non è letta. */

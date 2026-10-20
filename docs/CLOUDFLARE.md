@@ -2,6 +2,8 @@
 
 L'app e il suo backend girano insieme su Cloudflare, nel piano gratuito: l'app come sito statico, il backend su `/api` con un database D1. Ogni persona entra con email e password (su invito, finché l'app non è aperta a tutti), ha un budget mensile e il proprio archivio sincronizzato tra i dispositivi; la chiave Anthropic sta solo nei segreti del progetto.
 
+Con il backend attivo l'app è riservata a chi ha un account: senza accesso si vede solo la pagina di accesso, e all'uscita le ricette vengono tolte dal dispositivo (restano sul server). Sullo specchio GitHub Pages, senza backend, l'app resta libera e locale.
+
 Cloudflare offre due vie, con lo stesso codice: **Workers con risorse statiche** (quella che il cruscotto propone oggi; i file sono `worker.js` e `wrangler.jsonc`) e **Pages** (la via storica, `functions/api/[[path]].js`; su molti account nuovi la scheda Pages non compare più). La prima parte di questa guida segue i Workers; la via Pages è in fondo.
 
 Tempo richiesto: venti minuti la prima volta. Serve un account Cloudflare (gratuito) e l'accesso al repository GitHub.
@@ -32,6 +34,8 @@ Scheda **Impostazioni**, due blocchi diversi:
 I segreti del backend si possono aggiungere anche dopo, senza rifare la build. Senza `ANTHROPIC_API_KEY` tutto funziona tranne l'assistente.
 
 ### 5. Verifica, registrazione e inviti
+
+Senza terminale: apri `https://<indirizzo>/amministrazione`, inserisci la password amministratore (`ADMIN_TOKEN`), **Crea invito** con la tua email e **Manda l'invito** a te stesso; apri il link e registrati (il primo account è amministratore). Da lì in poi la stessa pagina serve per invitare gli altri, vedere consumi e persone, sospendere, generare il link per una nuova password. Con un account amministratore la pagina non chiede più la password.
 
 Dal terminale, con il tuo indirizzo al posto di `ricettario.pages.dev`, segui il passo 5 della via Pages qui sotto: `/api/health`, l'invito per te (il primo account diventa amministratore), poi gli inviti per gli altri. I comandi sono identici.
 

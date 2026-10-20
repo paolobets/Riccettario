@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { changePassword, listDevices, logout, logoutOthers, revokeDevice, useSignedIn, type Device } from '@/auth/session'
+import { changePassword, listDevices, logout, logoutOthers, revokeDevice, syncBeforeLogout, useSignedIn, type Device } from '@/auth/session'
 import type { Account } from '@/ai/account'
 import { formatUsd } from '@/ai/usage'
 import { useConfirm } from './ConfirmDialog'
@@ -83,11 +83,21 @@ export default function AccountSection({ account, onChange }: Props) {
   const exit = async () => {
     const ok = await confirm({
       title: 'Uscire dall\'account?',
-      body: 'Le ricette restano su questo dispositivo ma non si aggiornano più finché non rientri. L\'assistente non sarà disponibile.',
+      body: 'Ricette, diario e lista della spesa vengono tolti da questo dispositivo: restano sul server e tornano quando rientri.',
       confirmLabel: 'Esci',
       cancelLabel: 'Resta collegato',
     })
     if (!ok) return
+    if (!(await syncBeforeLogout())) {
+      const anyway = await confirm({
+        title: 'Non riesco a sincronizzare',
+        body: 'Il server non risponde: uscendo adesso perderesti le modifiche non ancora inviate. Meglio riprovare quando sei in rete.',
+        confirmLabel: 'Esci lo stesso',
+        cancelLabel: 'Resta collegato',
+        danger: true,
+      })
+      if (!anyway) return
+    }
     await logout()
     onChange()
   }
