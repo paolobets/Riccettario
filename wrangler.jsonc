@@ -6,6 +6,7 @@
   "name": "ricettario",
   "main": "worker.js",
   "compatibility_date": "2025-09-01",
+  "workers_dev": true,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
