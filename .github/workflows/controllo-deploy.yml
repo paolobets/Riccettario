@@ -1,9 +1,15 @@
 # Controlla da GitHub che l'app pubblicata su Cloudflare risponda: /api/health e
 # bundle con il backend integrato. Si lancia a mano (Actions → Controllo deploy → Run)
-# o a ogni modifica di questo file. Non tocca nulla: solo letture.
+# o a ogni modifica di questo file. Non tocca nulla: solo letture. Con "cerca" si
+# controlla se i bundle JS pubblicati contengono un testo (per sapere se un commit è live).
 name: Controllo deploy
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      cerca:
+        description: 'Testo da cercare nei bundle JS pubblicati (facoltativo)'
+        required: false
+        default: ''
   push:
     branches: [main]
     paths: ['.github/workflows/controllo-deploy.yml']
@@ -12,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Interroga gli indirizzi pubblicati
+        env:
+          CERCA: ${{ inputs.cerca }}
         run: |
           for u in https://ha-betarena.it https://ricettario.ha-betarena.it https://riccettario.paolo-bets.workers.dev https://ricettario.paolo-bets.workers.dev; do
             echo "=================== $u"
@@ -21,4 +29,11 @@ jobs:
             html=$(curl -sS -m 20 "$u/" || true)
             echo "$html" | head -c 300; echo
             echo "backend dichiarato nell'HTML: $(echo "$html" | grep -o 'name="ricettario-backend" content="[^"]*"' | head -1 || echo 'nessuno (build vecchia)')"
+            if [ -n "$CERCA" ]; then
+              trovato=no
+              for js in $(echo "$html" | grep -o '/assets/[^"]*\.js' | sort -u); do
+                curl -sS -m 20 "$u$js" | grep -qF "$CERCA" && trovato="si ($js)"
+              done
+              echo "testo cercato nei bundle: $trovato"
+            fi
           done
