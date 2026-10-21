@@ -31,7 +31,10 @@ jobs:
             echo "backend dichiarato nell'HTML: $(echo "$html" | grep -o 'name="ricettario-backend" content="[^"]*"' | head -1 || echo 'nessuno (build vecchia)')"
             if [ -n "$CERCA" ]; then
               trovato=no
-              for js in $(echo "$html" | grep -o '/assets/[^"]*\.js' | sort -u); do
+              # i bundle della pagina e i pezzi caricati a richiesta che citano
+              entrate=$(echo "$html" | grep -o '/assets/[^"]*\.js' | sort -u)
+              tutti=$(for js in $entrate; do echo "$js"; curl -sS -m 20 "$u$js" | grep -o 'assets/[A-Za-z0-9_.-]*\.js' | sed 's|^|/|'; done | sort -u)
+              for js in $tutti; do
                 curl -sS -m 20 "$u$js" | grep -qF "$CERCA" && trovato="si ($js)"
               done
               echo "testo cercato nei bundle: $trovato"
