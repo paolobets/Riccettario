@@ -4,7 +4,7 @@
  * validazione dei riferimenti.
  */
 import { z } from 'zod'
-import { newId, slugify, UNITS, type Ingredient, type Recipe, type ScalingRule, type Step, type Unit } from '@/core'
+import { newId, slugify, UNITS, type Ingredient, type Pan, type Recipe, type ScalingRule, type Step, type Unit } from '@/core'
 
 // L'API limita a 16 i parametri con tipi unione (nullable o anyOf) in tutto lo
 // schema: i testi facoltativi usano quindi la stringa vuota invece di null.
@@ -16,7 +16,7 @@ export const aiIngredientSchema = z.object({
   scaling: z
     .enum(['linear', 'sublinear', 'discrete', 'fixed', 'toTaste', 'bakersPercent'])
     .describe(
-      'linear: farina, acqua, pasta, carne. sublinear: sale, spezie, lievito, aromi. discrete: uova e pezzi interi. fixed: una foglia di alloro, la teglia. toTaste: q.b. bakersPercent: solo negli impasti, per ingredienti espressi in % della farina.',
+      'linear: farina, acqua, pasta, carne. sublinear: sale, spezie, lievito, aromi. discrete: uova e pezzi interi. fixed: una foglia di alloro. toTaste: q.b. bakersPercent: solo negli impasti, per ingredienti espressi in % della farina.',
     ),
   bakersPercent: z.number().nullable().describe('Solo se scaling=bakersPercent: percentuale rispetto all\'ingrediente base'),
   bakersOf: z.string().describe('Solo se scaling=bakersPercent: id dell\'ingrediente base (di solito la farina), altrimenti stringa vuota'),
@@ -50,6 +50,9 @@ export const aiRecipeSchema = z.object({
   servings: z.number().describe('Porzioni per cui sono scritte le quantità; stima se non indicate'),
   yieldAmount: z.number().nullable().describe('Resa totale se ha senso (es. grammi di impasto), altrimenti null'),
   yieldUnit: z.string().describe('Unità della resa (es. "g"), stringa vuota se non c\'è resa'),
+  panShape: z.enum(['', 'round', 'rect']).describe('Teglia o stampo per cui sono scritte le dosi: round tonda, rect rettangolare o quadrata, stringa vuota se la ricetta non ne indica una'),
+  panWidthCm: z.number().describe('Diametro della teglia tonda o primo lato della rettangolare, in cm; 0 se non c\'è teglia'),
+  panLengthCm: z.number().describe('Secondo lato della teglia rettangolare (uguale al primo se quadrata), in cm; 0 per la tonda o senza teglia'),
   tags: z.array(z.string()).describe('Tag brevi in minuscolo: primi, dolci, lievitati, veloce, vegetariano…'),
   ingredients: z.array(aiIngredientSchema),
   steps: z.array(aiStepSchema),
@@ -62,6 +65,16 @@ export type AiRecipe = z.infer<typeof aiRecipeSchema>
 export interface ConversionResult {
   recipe: Recipe
   warnings: string[]
+}
+
+/** Teglia dai tre campi senza unioni; una rettangolare con un solo lato è quadrata. */
+function aiPan(ai: AiRecipe): Pan | undefined {
+  const a = ai.panWidthCm
+  const b = ai.panLengthCm
+  if (!(a > 0)) return undefined
+  if (ai.panShape === 'round') return { shape: 'round', diameterCm: a }
+  if (ai.panShape === 'rect') return { shape: 'rect', widthCm: a, lengthCm: b > 0 ? b : a }
+  return undefined
 }
 
 /** Converte la risposta dell'AI nel modello interno, correggendo id e riferimenti. */
@@ -150,6 +163,7 @@ export function aiToRecipe(ai: AiRecipe, base?: Partial<Pick<Recipe, 'id' | 'cre
     description: ai.description?.trim() || undefined,
     servings: ai.servings > 0 ? ai.servings : 4,
     yield: ai.yieldAmount && ai.yieldAmount > 0 ? { amount: ai.yieldAmount, unit: ai.yieldUnit?.trim() || 'g' } : undefined,
+    pan: aiPan(ai),
     tags: ai.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
     sections: sections.length ? sections : undefined,
     ingredients,

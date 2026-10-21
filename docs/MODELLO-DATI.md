@@ -62,6 +62,9 @@ Dopo la scalatura le quantità lineari e sub-lineari vengono **arrotondate a mis
 - **Porzioni**: F = porzioni richieste / porzioni della ricetta.
 - **Resa**: F = resa richiesta / resa della ricetta (serve `yield`).
 - **Teglia**: F = area della teglia scelta / area della teglia della ricetta (serve `pan`); tonda = π(d/2)², rettangolare = lato × lato. Lo spessore resta quello pensato dall'autore; i tempi di cottura, come sempre, non scalano (`pan.ts`).
+- **Più teglie**: F = area totale delle teglie scelte / area della teglia della ricetta, con ogni riga "n teglie di una misura" (`factorFromPans`). Dopo l'applicazione l'impasto si divide tra le teglie in proporzione all'area (`splitDough`).
+- **Impasto per cm²**: se la ricetta non ha `pan` ma è un impasto da teglia (titolo o tag con pizza, focaccia o pinsa, `doughTypeOf`), F = area totale × grammi per cm² / peso dell'impasto. Valori proposti e modificabili: pizza in teglia 0,55, focaccia 0,6, pinsa 0,4 g/cm² (`DOUGH_TYPES`). Il peso dell'impasto (`doughWeight`) è la resa se è in g o kg, altrimenti la somma degli ingredienti in grammi e millilitri (1 ml ≈ 1 g) della sezione "Impasto" se esiste, esclusi q.b., fissi e facoltativi.
+- **Pizze o panetti**: F = numero × grammi di ciascuno / peso dell'impasto (`factorFromPieces`).
 - **Pivot**: l'utente dichiara la quantità di un ingrediente. Per `linear` e `discrete` F = nuova / originale; per `sublinear` si inverte la curva (F = (nuova/originale)^(1/e)); per `bakersPercent` si risale alla base. `fixed` e `toTaste` non possono guidare la scalatura.
 
 ### Fattori fattibili
@@ -133,7 +136,7 @@ Un ingrediente con `recipeId` è una **base**: un'altra ricetta che entra in que
 
 ## Scambio con l'AI
 
-`src/ai/schema.ts` definisce con zod uno schema di scambio più semplice del modello interno: riferimenti agli ingredienti per id scelto dall'AI, passaggi paralleli per indice, campi `null` invece di assenti per numeri e tipo di passaggio, stringa vuota per i testi facoltativi (l'API accetta al massimo 16 parametri con tipi unione in tutto lo schema, e un test lo controlla). `aiToRecipe` lo converte in `Recipe` normalizzando gli id (`slugify`, deduplica), riscrivendo i riferimenti `{id}` nei passaggi, risolvendo le percentuali del panettiere e scartando con avviso ciò che non torna. Le richieste usano l'output strutturato dell'API (`output_config.format`), quindi la risposta è sempre JSON valido rispetto allo schema.
+`src/ai/schema.ts` definisce con zod uno schema di scambio più semplice del modello interno: riferimenti agli ingredienti per id scelto dall'AI, passaggi paralleli per indice, campi `null` invece di assenti per numeri e tipo di passaggio, stringa vuota per i testi facoltativi, teglia in tre campi senza unioni (`panShape` vuoto e misure 0 se assente) (l'API accetta al massimo 16 parametri con tipi unione in tutto lo schema, e un test lo controlla). `aiToRecipe` lo converte in `Recipe` normalizzando gli id (`slugify`, deduplica), riscrivendo i riferimenti `{id}` nei passaggi, risolvendo le percentuali del panettiere e scartando con avviso ciò che non torna. Le richieste usano l'output strutturato dell'API (`output_config.format`), quindi la risposta è sempre JSON valido rispetto allo schema.
 
 ## Sessioni di cottura
 

@@ -1,6 +1,23 @@
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import Icon from './Icon'
-import { factorFromPan, formatFactor, formatPan, isFactorFeasible, suggestFeasibleFactors, type Pan, type Recipe, type ScaledRecipe } from '@/core'
+import {
+  DOUGH_TYPES,
+  doughTypeOf,
+  doughWeight,
+  factorFromPans,
+  factorFromPieces,
+  formatFactor,
+  formatPan,
+  formatQuantity,
+  isFactorFeasible,
+  recipeDoughDensity,
+  splitDough,
+  suggestFeasibleFactors,
+  type Pan,
+  type PanCount,
+  type Recipe,
+  type ScaledRecipe,
+} from '@/core'
 
 interface Props {
   recipe: Recipe
@@ -19,10 +36,6 @@ function yieldIsEditable(recipe: Recipe): boolean {
 
 export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFactor, onReset }: Props) {
   const [yieldInput, setYieldInput] = useState('')
-  const [panShape, setPanShape] = useState<Pan['shape']>(recipe.pan?.shape ?? 'round')
-  const [panA, setPanA] = useState('')
-  const [panB, setPanB] = useState('')
-  const panId = useId()
   const servingsId = useId()
   const yieldId = useId()
   const servings = Math.round(scaled.servings * 100) / 100
@@ -102,37 +115,7 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
         </form>
       )}
 
-      {recipe.pan && (
-        <form
-          className="space-y-1"
-          onSubmit={(e) => {
-            e.preventDefault()
-            const a = Number(panA)
-            const b = Number(panB)
-            const target: Pan | null = panShape === 'round' ? (a > 0 ? { shape: 'round', diameterCm: a } : null) : a > 0 && b > 0 ? { shape: 'rect', widthCm: a, lengthCm: b } : null
-            const f = target ? factorFromPan(recipe, target) : null
-            if (f) onFactor(f)
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <label htmlFor={panId} className="w-24 shrink-0 text-sm text-muted">
-              Teglia
-            </label>
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <select id={panId} className="min-w-0 py-1.5 text-sm" value={panShape} onChange={(e) => setPanShape(e.target.value as Pan['shape'])}>
-                <option value="round">tonda</option>
-                <option value="rect">rettangolare</option>
-              </select>
-              <input type="number" min={1} step="any" className="w-20 min-w-0 py-1.5" aria-label={panShape === 'round' ? 'Diametro in centimetri' : 'Lato in centimetri'} placeholder={panShape === 'round' ? 'Ø cm' : 'cm'} value={panA} onChange={(e) => setPanA(e.target.value)} />
-              {panShape === 'rect' && <input type="number" min={1} step="any" className="w-20 min-w-0 py-1.5" aria-label="Altro lato in centimetri" placeholder="cm" value={panB} onChange={(e) => setPanB(e.target.value)} />}
-              <button className="btn-secondary min-h-9 px-3 py-1.5 text-sm" type="submit" disabled={!panA || (panShape === 'rect' && !panB)}>
-                Applica
-              </button>
-            </div>
-          </div>
-          <p className="pl-27 text-xs text-muted">La ricetta è per una teglia {formatPan(recipe.pan)}: il fattore segue il rapporto tra le aree, lo spessore resta uguale.</p>
-        </form>
-      )}
+      <PanPlanner recipe={recipe} factor={scaled.factor} onFactor={onFactor} />
 
       <p className="inline-flex items-start gap-1.5 text-xs text-muted">
         <Icon name="edit" size={14} className="mt-0.5" />
@@ -161,5 +144,156 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
         </p>
       ))}
     </section>
+  )
+}
+
+interface PanRow {
+  key: number
+  count: string
+  shape: Pan['shape']
+  a: string
+  b: string
+}
+
+function rowToPan(r: PanRow): PanCount | null {
+  const count = Number(r.count)
+  const a = Number(r.a)
+  const b = Number(r.b)
+  if (!(count > 0) || !(a > 0)) return null
+  if (r.shape === 'round') return { pan: { shape: 'round', diameterCm: a }, count }
+  return b > 0 ? { pan: { shape: 'rect', widthCm: a, lengthCm: b }, count } : null
+}
+
+const decimal = (n: number, digits = 2) => n.toLocaleString('it-IT', { maximumFractionDigits: digits })
+const grams = (g: number) => formatQuantity({ amount: Math.round(g / 5) * 5, unit: 'g' })
+
+/**
+ * Teglie e pizze: una o più teglie (1 da 40×40, oppure 2 da 15×25) o un numero di
+ * panetti. Compare se la ricetta ha una teglia o è un impasto da teglia.
+ */
+function PanPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: number; onFactor: (f: number) => void }) {
+  const type = doughTypeOf(recipe)
+  const dough = doughWeight(recipe)
+  const ownDensity = recipeDoughDensity(recipe)
+  const nextKey = useRef(1)
+  const [rows, setRows] = useState<PanRow[]>(() => [{ key: 0, count: '1', shape: recipe.pan?.shape ?? 'rect', a: '', b: '' }])
+  const [density, setDensity] = useState(() => String(type ? DOUGH_TYPES[type].gPerCm2 : 0.55).replace('.', ','))
+  const [applied, setApplied] = useState<{ pans: PanCount[]; factor: number } | null>(null)
+  const [pieces, setPieces] = useState('')
+  const [pieceGrams, setPieceGrams] = useState('250')
+  const id = useId()
+  if (!recipe.pan && !(type && dough)) return null
+
+  const pans = rows.map(rowToPan)
+  const ready = pans.length > 0 && pans.every(Boolean)
+  const gPerCm2 = Number(density.replace(',', '.'))
+  const update = (key: number, patch: Partial<PanRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+  const showSplit = applied && Math.abs(applied.factor - factor) < 1e-3 && dough
+
+  return (
+    <div className="rule space-y-3 pt-3">
+      <form
+        className="space-y-2"
+        aria-labelledby={`${id}-pan`}
+        onSubmit={(e) => {
+          e.preventDefault()
+          const chosen = pans.filter((p): p is PanCount => Boolean(p))
+          const f = factorFromPans(recipe, chosen, gPerCm2)
+          if (!f) return
+          onFactor(f)
+          setApplied({ pans: chosen, factor: f })
+        }}
+      >
+        <p id={`${id}-pan`} className="text-sm text-muted">
+          Teglie
+        </p>
+        {rows.map((r, idx) => (
+          <div key={r.key} className="flex flex-wrap items-center gap-1.5">
+            <input type="number" min={1} step={1} className="w-12 shrink-0 px-1 py-1.5 text-center" aria-label={`Numero di teglie, riga ${idx + 1}`} value={r.count} onChange={(e) => update(r.key, { count: e.target.value })} />
+            <select className="w-30 shrink-0 px-2 py-1.5 text-sm" aria-label={`Forma, riga ${idx + 1}`} value={r.shape} onChange={(e) => update(r.key, { shape: e.target.value as Pan['shape'] })}>
+              <option value="rect">rettangolare</option>
+              <option value="round">tonda</option>
+            </select>
+            <div className="flex min-w-40 flex-1 items-center gap-1.5">
+            <input type="number" min={1} step="any" className="min-w-0 flex-1 px-2 py-1.5" aria-label={r.shape === 'round' ? `Diametro in centimetri, riga ${idx + 1}` : `Lato in centimetri, riga ${idx + 1}`} placeholder={r.shape === 'round' ? 'Ø cm' : 'cm'} value={r.a} onChange={(e) => update(r.key, { a: e.target.value })} />
+            {r.shape === 'rect' && (
+              <>
+                <span className="text-muted" aria-hidden="true">
+                  ×
+                </span>
+                <input type="number" min={1} step="any" className="min-w-0 flex-1 px-2 py-1.5" aria-label={`Altro lato in centimetri, riga ${idx + 1}`} placeholder="cm" value={r.b} onChange={(e) => update(r.key, { b: e.target.value })} />
+              </>
+            )}
+            {rows.length > 1 && (
+              <button type="button" className="btn-ghost h-9 w-9 shrink-0 p-0" aria-label={`Togli la riga ${idx + 1}`} onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}>
+                <Icon name="close" size={16} />
+              </button>
+            )}
+            </div>
+          </div>
+        ))}
+        {!recipe.pan && (
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={`${id}-density`} className="text-sm text-muted">
+              Impasto per cm²
+            </label>
+            <input id={`${id}-density`} inputMode="decimal" className="w-20 min-w-0 px-2 py-1.5 text-center" value={density} onChange={(e) => setDensity(e.target.value)} />
+            <span className="text-sm text-muted">g</span>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="btn-ghost min-h-9 px-2 py-1 text-sm" onClick={() => setRows((rs) => [...rs, { key: nextKey.current++, count: '1', shape: rs[rs.length - 1]?.shape ?? 'rect', a: '', b: '' }])}>
+            <Icon name="plus" size={16} /> Aggiungi teglia
+          </button>
+          <button className="btn-secondary min-h-9 px-3 py-1.5 text-sm" type="submit" disabled={!ready || (!recipe.pan && !(gPerCm2 > 0))}>
+            Applica
+          </button>
+        </div>
+        <p className="text-xs text-muted">
+          {recipe.pan
+            ? `La ricetta è per una teglia ${formatPan(recipe.pan)}${ownDensity ? `, circa ${decimal(ownDensity)} g di impasto per cm²` : ''}: le dosi seguono l'area totale, lo spessore resta uguale.`
+            : `Senza teglia nella ricetta le dosi si calcolano dal peso dell'impasto (${grams(dough!)}): di solito ${Object.values(DOUGH_TYPES)
+                .map((d) => `${decimal(d.gPerCm2)} g per ${d.label}`)
+                .join(', ')}.`}
+        </p>
+        {showSplit && (
+          <ul className="space-y-0.5 text-sm" aria-label="Impasto per teglia">
+            {splitDough(dough * factor, applied.pans).map((p, i) => (
+              <li key={i} className="flex items-center gap-1.5">
+                <Icon name="pan" size={14} className="text-muted" />
+                <span>
+                  {p.count > 1 ? `${p.count} teglie ${formatPan(p.pan)}: ` : `Teglia ${formatPan(p.pan)}: `}
+                  <span className="qty">{grams(p.grams)}</span> di impasto{p.count > 1 ? ' ciascuna' : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </form>
+
+      {type && dough && (
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const f = factorFromPieces(recipe, Number(pieces), Number(pieceGrams))
+            if (f) onFactor(f)
+          }}
+        >
+          <label htmlFor={`${id}-pieces`} className="text-sm text-muted">
+            {type === 'focaccia' ? 'Panetti' : type === 'pinsa' ? 'Pinse' : 'Pizze'}
+          </label>
+          <input id={`${id}-pieces`} type="number" min={1} step={1} className="w-16 min-w-0 px-2 py-1.5 text-center" value={pieces} placeholder={String(Math.max(1, Math.round(dough / Number(pieceGrams || 250))))} onChange={(e) => setPieces(e.target.value)} />
+          <label htmlFor={`${id}-grams`} className="text-sm text-muted">
+            da
+          </label>
+          <input id={`${id}-grams`} type="number" min={1} step="any" className="w-20 min-w-0 px-2 py-1.5 text-center" value={pieceGrams} onChange={(e) => setPieceGrams(e.target.value)} />
+          <span className="text-sm text-muted">g</span>
+          <button className="btn-secondary min-h-9 px-3 py-1.5 text-sm" type="submit" disabled={!(Number(pieces) > 0 && Number(pieceGrams) > 0)}>
+            Applica
+          </button>
+        </form>
+      )}
+    </div>
   )
 }

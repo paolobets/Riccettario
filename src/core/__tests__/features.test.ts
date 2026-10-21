@@ -3,7 +3,7 @@ import { pane } from './fixtures'
 import type { Recipe } from '../model'
 import { buildShoppingList, shoppingListText } from '../shopping'
 import { planBackwards, parseReadyAt, stepMinutes, upcomingStarts } from '../schedule'
-import { equivalentRound, factorFromPan, formatPan, panArea } from '../pan'
+import { doughTypeOf, doughWeight, equivalentRound, factorFromPan, factorFromPans, factorFromPieces, formatPan, panArea, recipeDoughDensity, splitDough, totalPanArea } from '../pan'
 import { checkRecipe } from '../lint'
 import { decodeRecipeFromLink, encodeRecipeForLink, recipeToText } from '../share'
 import { scaleRecipe } from '../scaling'
@@ -111,6 +111,50 @@ describe('teglia', () => {
     expect(formatPan({ shape: 'round', diameterCm: 24 })).toBe('tonda da 24 cm')
     expect(formatPan({ shape: 'rect', widthCm: 30, lengthCm: 20 })).toBe('rettangolare 30×20 cm')
     expect(equivalentRound({ shape: 'rect', widthCm: 30, lengthCm: 20 })).toBe(28)
+  })
+})
+
+describe('più teglie e impasti', () => {
+  const quadrata: Recipe = { ...pane, title: 'Focaccia', pan: { shape: 'rect', widthCm: 30, lengthCm: 30 } }
+  const pizza: Recipe = { ...pane, title: 'Pizza in teglia', yield: undefined, pan: undefined }
+  it('area totale e fattore da più teglie', () => {
+    const due = [{ pan: { shape: 'rect' as const, widthCm: 15, lengthCm: 25 }, count: 2 }]
+    expect(totalPanArea(due)).toBe(750)
+    expect(factorFromPans(quadrata, due)).toBeCloseTo(750 / 900)
+    expect(factorFromPans(quadrata, [{ pan: { shape: 'rect', widthCm: 40, lengthCm: 40 }, count: 1 }])).toBeCloseTo(1600 / 900)
+    expect(factorFromPans(quadrata, [])).toBeNull()
+  })
+  it('peso dell\'impasto: resa, oppure somma di grammi e millilitri senza q.b. e fissi', () => {
+    expect(doughWeight(pane)).toBe(850)
+    expect(doughWeight(pizza)).toBe(860) // farina 500 + acqua 350 + sale 10
+    const conSezioni: Recipe = {
+      ...pizza,
+      ingredients: [
+        { id: 'farina', name: 'farina', quantity: { amount: 1, unit: 'kg' }, section: 'Impasto' },
+        { id: 'mozzarella', name: 'mozzarella', quantity: { amount: 300, unit: 'g' }, section: 'Condimento' },
+      ],
+    }
+    expect(doughWeight(conSezioni)).toBe(1000)
+  })
+  it('senza teglia nella ricetta usa i grammi per cm²', () => {
+    expect(factorFromPans(pizza, [{ pan: { shape: 'rect', widthCm: 40, lengthCm: 40 }, count: 1 }])).toBeNull()
+    expect(factorFromPans(pizza, [{ pan: { shape: 'rect', widthCm: 40, lengthCm: 40 }, count: 1 }], 0.55)).toBeCloseTo((1600 * 0.55) / 860)
+  })
+  it('pizze da n grammi, densità della ricetta e divisione tra teglie', () => {
+    expect(factorFromPieces(pizza, 4, 250)).toBeCloseTo(1000 / 860)
+    expect(factorFromPieces(pizza, 0, 250)).toBeNull()
+    expect(recipeDoughDensity({ ...pane, pan: { shape: 'rect', widthCm: 25, lengthCm: 34 } })).toBeCloseTo(1)
+    const parts = splitDough(1200, [
+      { pan: { shape: 'rect', widthCm: 40, lengthCm: 40 }, count: 1 },
+      { pan: { shape: 'rect', widthCm: 20, lengthCm: 40 }, count: 1 },
+    ])
+    expect(parts.map((p) => Math.round(p.grams))).toEqual([800, 400])
+  })
+  it('riconosce pizza, focaccia e pinsa', () => {
+    expect(doughTypeOf(pizza)).toBe('pizza')
+    expect(doughTypeOf(quadrata)).toBe('focaccia')
+    expect(doughTypeOf({ ...pane, title: 'Pinsa romana' })).toBe('pinsa')
+    expect(doughTypeOf(pane)).toBeUndefined()
   })
 })
 

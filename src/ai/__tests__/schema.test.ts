@@ -9,6 +9,9 @@ const sample: AiRecipe = {
   servings: 6,
   yieldAmount: 900,
   yieldUnit: 'g',
+  panShape: 'rect',
+  panWidthCm: 30,
+  panLengthCm: 0,
   tags: ['Lievitati', ' base '],
   ingredients: [
     { id: 'Farina 0', name: 'farina 0', amount: 500, unit: 'g', scaling: 'linear', bakersPercent: null, bakersOf: '', note: '', section: '', optional: false },
@@ -64,6 +67,9 @@ describe('aiToRecipe', () => {
     expect(recipe.sections).toEqual(['Condimento'])
     expect(recipe.yield).toEqual({ amount: 900, unit: 'g' })
     expect(recipe.source).toBe('nonna')
+    expect(recipe.pan).toEqual({ shape: 'rect', widthCm: 30, lengthCm: 30 })
+    expect(aiToRecipe({ ...sample, panShape: 'round', panWidthCm: 24 }).recipe.pan).toEqual({ shape: 'round', diameterCm: 24 })
+    expect(aiToRecipe({ ...sample, panShape: '', panWidthCm: 0 }).recipe.pan).toBeUndefined()
   })
 
   it('produce una ricetta che il motore sa scalare', () => {
