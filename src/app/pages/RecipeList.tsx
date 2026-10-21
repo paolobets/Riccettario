@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { loadSamples } from '@/data/repo'
@@ -7,6 +7,7 @@ import { activeDuration, formatDuration, totalDuration, type Recipe } from '@/co
 import { HOSTED } from '@/ai/settings'
 import { useSignedIn } from '@/auth/session'
 import Icon from '../components/Icon'
+import WelcomeGuide, { guideSeen } from '../components/WelcomeGuide'
 
 type Sort = 'recenti' | 'alfabetico' | 'cucinate'
 const SORT_KEY = 'lista:ordine'
@@ -40,6 +41,15 @@ export default function RecipeList() {
   const [onlyFavorites, setOnlyFavorites] = useState(false)
   const [sort, setSort] = useState<Sort>(() => loadSort())
   const signedIn = useSignedIn()
+  const [params, setParams] = useSearchParams()
+  // Alla prima apertura, oppure su richiesta da Impostazioni con `?guida`.
+  const [firstVisit] = useState(() => !guideSeen())
+  const [guideClosed, setGuideClosed] = useState(false)
+  const showGuide = (params.has('guida') || (firstVisit && !guideClosed)) && (!HOSTED || signedIn === true)
+  const closeGuide = () => {
+    setGuideClosed(true)
+    if (params.has('guida')) setParams((p) => { p.delete('guida'); return p }, { replace: true })
+  }
   useEffect(() => {
     try {
       localStorage.setItem(SORT_KEY, sort)
@@ -92,6 +102,7 @@ export default function RecipeList() {
   return (
     <div className="space-y-4">
       <h1 className="sr-only">Ricette</h1>
+      {showGuide && <WelcomeGuide empty={recipes.length === 0} onLoadSamples={() => loadSamples()} onClose={closeGuide} />}
       {HOSTED && signedIn === false && (
         <div className="notice flex flex-wrap items-center justify-between gap-2 bg-info-soft text-info">
           <span>Accedi per usare l'assistente e ritrovare le ricette su ogni dispositivo.</span>

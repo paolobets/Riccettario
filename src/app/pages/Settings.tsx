@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { exportAll, importJson } from '@/data/repo'
 import { DEFAULT_MODEL, HOSTED, loadAiSettings, MODELS, saveAiSettings, type AiSettings } from '@/ai/settings'
 import { formatUsd, loadUsage, resetUsage, type UsageTotals } from '@/ai/usage'
@@ -263,6 +264,13 @@ export default function Settings() {
             {message}
           </p>
         )}
+      </section>
+      <section className="rule space-y-2 pt-4 text-sm text-fg-2">
+        <h2 className="section-title text-lg">Guida</h2>
+        <p>Le funzioni principali dell'app in cinque schermate, le stesse della prima apertura.</p>
+        <Link to="/?guida" className="btn-secondary">
+          <Icon name="book" size={16} /> Rivedi la guida
+        </Link>
       </section>
       <section className="rule space-y-2 pt-4 text-sm text-fg-2">
         <h2 className="section-title text-lg">Come funziona la scalatura</h2>
