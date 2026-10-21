@@ -3,7 +3,7 @@ import { pane } from './fixtures'
 import type { Recipe } from '../model'
 import { buildShoppingList, shoppingListText } from '../shopping'
 import { planBackwards, parseReadyAt, stepMinutes, upcomingStarts } from '../schedule'
-import { doughTypeOf, doughWeight, equivalentRound, factorFromPan, factorFromPans, factorFromPieces, formatPan, panArea, recipeDoughDensity, splitDough, totalPanArea } from '../pan'
+import { DOUGH_TYPES, doughTypeOf, doughWeight, equivalentRound, factorFromPan, factorFromPans, factorFromPieces, formatPan, panArea, recipeDoughDensity, splitDough, totalPanArea } from '../pan'
 import { checkRecipe } from '../lint'
 import { decodeRecipeFromLink, encodeRecipeForLink, recipeToText } from '../share'
 import { scaleRecipe } from '../scaling'
@@ -140,6 +140,11 @@ describe('più teglie e impasti', () => {
     expect(factorFromPans(pizza, [{ pan: { shape: 'rect', widthCm: 40, lengthCm: 40 }, count: 1 }])).toBeNull()
     expect(factorFromPans(pizza, [{ pan: { shape: 'rect', widthCm: 40, lengthCm: 40 }, count: 1 }], 0.55)).toBeCloseTo((1600 * 0.55) / 860)
   })
+  it('indice di carico: 60×40 di pizza in teglia ≈ 1,2 kg, 30×40 di genovese ≈ 500 g', () => {
+    const impasto = (t: keyof typeof DOUGH_TYPES, w: number, l: number) => totalPanArea([{ pan: { shape: 'rect', widthCm: w, lengthCm: l }, count: 1 }]) * DOUGH_TYPES[t].gPerCm2
+    expect(impasto('pizzaTeglia', 60, 40)).toBeCloseTo(1200)
+    expect(Math.round(impasto('genovese', 30, 40))).toBe(504)
+  })
   it('pizze da n grammi, densità della ricetta e divisione tra teglie', () => {
     expect(factorFromPieces(pizza, 4, 250)).toBeCloseTo(1000 / 860)
     expect(factorFromPieces(pizza, 0, 250)).toBeNull()
@@ -151,8 +156,10 @@ describe('più teglie e impasti', () => {
     expect(parts.map((p) => Math.round(p.grams))).toEqual([800, 400])
   })
   it('riconosce pizza, focaccia e pinsa', () => {
-    expect(doughTypeOf(pizza)).toBe('pizza')
+    expect(doughTypeOf(pizza)).toBe('pizzaTeglia')
     expect(doughTypeOf(quadrata)).toBe('focaccia')
+    expect(doughTypeOf({ ...pane, title: 'Fugassa' })).toBe('genovese')
+    expect(doughTypeOf({ ...pane, title: 'Pizza napoletana' })).toBe('napoletana')
     expect(doughTypeOf({ ...pane, title: 'Pinsa romana' })).toBe('pinsa')
     expect(doughTypeOf(pane)).toBeUndefined()
   })

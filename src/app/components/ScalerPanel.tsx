@@ -13,6 +13,7 @@ import {
   recipeDoughDensity,
   splitDough,
   suggestFeasibleFactors,
+  type DoughType,
   type Pan,
   type PanCount,
   type Recipe,
@@ -177,7 +178,8 @@ function PanPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: numb
   const ownDensity = recipeDoughDensity(recipe)
   const nextKey = useRef(1)
   const [rows, setRows] = useState<PanRow[]>(() => [{ key: 0, count: '1', shape: recipe.pan?.shape ?? 'rect', a: '', b: '' }])
-  const [density, setDensity] = useState(() => String(type ? DOUGH_TYPES[type].gPerCm2 : 0.55).replace('.', ','))
+  const [kind, setKind] = useState<DoughType | ''>(type ?? 'pizzaTeglia')
+  const [density, setDensity] = useState(() => decimal(DOUGH_TYPES[type ?? 'pizzaTeglia'].gPerCm2))
   const [applied, setApplied] = useState<{ pans: PanCount[]; factor: number } | null>(null)
   const [pieces, setPieces] = useState('')
   const [pieceGrams, setPieceGrams] = useState('250')
@@ -234,11 +236,38 @@ function PanPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: numb
         ))}
         {!recipe.pan && (
           <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor={`${id}-density`} className="text-sm text-muted">
-              Impasto per cm²
+            <label htmlFor={`${id}-kind`} className="sr-only">
+              Tipo di impasto
             </label>
-            <input id={`${id}-density`} inputMode="decimal" className="w-20 min-w-0 px-2 py-1.5 text-center" value={density} onChange={(e) => setDensity(e.target.value)} />
-            <span className="text-sm text-muted">g</span>
+            <select
+              id={`${id}-kind`}
+              className="min-w-0 flex-1 px-2 py-1.5 text-sm"
+              value={kind}
+              onChange={(e) => {
+                const k = e.target.value as DoughType | ''
+                setKind(k)
+                if (k) setDensity(decimal(DOUGH_TYPES[k].gPerCm2))
+              }}
+            >
+              {(Object.keys(DOUGH_TYPES) as DoughType[]).map((k) => (
+                <option key={k} value={k}>
+                  {DOUGH_TYPES[k].label}
+                </option>
+              ))}
+              <option value="">altro spessore</option>
+            </select>
+            <input
+              id={`${id}-density`}
+              inputMode="decimal"
+              aria-label="Grammi di impasto per centimetro quadrato"
+              className="w-20 min-w-0 px-2 py-1.5 text-center"
+              value={density}
+              onChange={(e) => {
+                setDensity(e.target.value)
+                setKind('')
+              }}
+            />
+            <span className="text-sm text-muted">g per cm²</span>
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2">
@@ -252,9 +281,7 @@ function PanPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: numb
         <p className="text-xs text-muted">
           {recipe.pan
             ? `La ricetta è per una teglia ${formatPan(recipe.pan)}${ownDensity ? `, circa ${decimal(ownDensity)} g di impasto per cm²` : ''}: le dosi seguono l'area totale, lo spessore resta uguale.`
-            : `Senza teglia nella ricetta le dosi si calcolano dal peso dell'impasto (${grams(dough!)}): di solito ${Object.values(DOUGH_TYPES)
-                .map((d) => `${decimal(d.gPerCm2)} g per ${d.label}`)
-                .join(', ')}.`}
+            : `Impasto = area della teglia × grammi per cm² (indice di carico), qui su ${grams(dough!)} di impasto della ricetta. Più alto il valore, più alta la pizza: correggi a gusto.`}
         </p>
         {showSplit && (
           <ul className="space-y-0.5 text-sm" aria-label="Impasto per teglia">

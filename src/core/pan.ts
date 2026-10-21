@@ -44,21 +44,34 @@ export function totalPanArea(pans: PanCount[]): number {
   return pans.reduce((sum, p) => (isValidPan(p.pan) && p.count > 0 ? sum + panArea(p.pan) * p.count : sum), 0)
 }
 
-/** Grammi di impasto per cm² tipici: con la stessa altezza la cottura resta quella della ricetta. */
+/**
+ * Indice di carico: grammi di impasto per cm² di teglia (impasto = area × indice).
+ * Valori medi delle schede professionali e dei calcolatori, da correggere a gusto (±10 %):
+ * 1,1–1,3 kg per una teglia 60×40 di pizza in teglia, circa 500 g per una 30×40 di genovese.
+ */
 export const DOUGH_TYPES = {
-  pizza: { label: 'pizza in teglia', gPerCm2: 0.55 },
-  focaccia: { label: 'focaccia', gPerCm2: 0.6 },
+  pizzaTeglia: { label: 'pizza in teglia', gPerCm2: 0.5 },
+  pizzaAlta: { label: 'pizza alta e soffice', gPerCm2: 0.6 },
+  napoletana: { label: 'pizza tonda napoletana', gPerCm2: 0.31 },
+  romana: { label: 'pizza tonda sottile', gPerCm2: 0.25 },
+  focaccia: { label: 'focaccia alta', gPerCm2: 0.6 },
+  genovese: { label: 'focaccia genovese', gPerCm2: 0.42 },
   pinsa: { label: 'pinsa', gPerCm2: 0.4 },
 } as const
 
 export type DoughType = keyof typeof DOUGH_TYPES
 
-/** Riconosce dal titolo o dai tag se la ricetta è un impasto da teglia. */
+/** Riconosce dal titolo o dai tag se la ricetta è un impasto da teglia, e di che tipo. */
 export function doughTypeOf(recipe: Recipe): DoughType | undefined {
   const text = [recipe.title, ...recipe.tags].join(' ').toLowerCase()
   if (/\bpins/.test(text)) return 'pinsa'
+  if (/genovese|fugass/.test(text)) return 'genovese'
   if (/focacc/.test(text)) return 'focaccia'
-  if (/\bpizz/.test(text)) return 'pizza'
+  if (/\bpizz/.test(text)) {
+    if (/napolet/.test(text)) return 'napoletana'
+    if (/sottile|scrocchiarella|romana tonda/.test(text)) return 'romana'
+    return 'pizzaTeglia'
+  }
   return undefined
 }
 
