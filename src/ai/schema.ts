@@ -6,6 +6,8 @@
 import { z } from 'zod'
 import { newId, slugify, UNITS, type Ingredient, type Recipe, type ScalingRule, type Step, type Unit } from '@/core'
 
+// L'API limita a 16 i parametri con tipi unione (nullable o anyOf) in tutto lo
+// schema: i testi facoltativi usano quindi la stringa vuota invece di null.
 export const aiIngredientSchema = z.object({
   id: z.string().describe('Identificatore breve in minuscolo senza spazi, es. "farina", "uova", "olio-evo". Unico nella ricetta.'),
   name: z.string().describe('Nome dell\'ingrediente in italiano, minuscolo, es. "farina 00"'),
@@ -17,9 +19,9 @@ export const aiIngredientSchema = z.object({
       'linear: farina, acqua, pasta, carne. sublinear: sale, spezie, lievito, aromi. discrete: uova e pezzi interi. fixed: una foglia di alloro, la teglia. toTaste: q.b. bakersPercent: solo negli impasti, per ingredienti espressi in % della farina.',
     ),
   bakersPercent: z.number().nullable().describe('Solo se scaling=bakersPercent: percentuale rispetto all\'ingrediente base'),
-  bakersOf: z.string().nullable().describe('Solo se scaling=bakersPercent: id dell\'ingrediente base (di solito la farina)'),
-  note: z.string().nullable().describe('Preparazione o nota breve: "a cubetti", "a temperatura ambiente"'),
-  section: z.string().nullable().describe('Sezione della ricetta se ce ne sono più di una (es. "Impasto", "Farcitura"), altrimenti null'),
+  bakersOf: z.string().describe('Solo se scaling=bakersPercent: id dell\'ingrediente base (di solito la farina), altrimenti stringa vuota'),
+  note: z.string().describe('Preparazione o nota breve: "a cubetti", "a temperatura ambiente"; stringa vuota se assente'),
+  section: z.string().describe('Sezione della ricetta se ce ne sono più di una (es. "Impasto", "Farcitura"), altrimenti stringa vuota'),
   optional: z.boolean(),
 })
 
@@ -33,9 +35,9 @@ export const aiStepSchema = z.object({
   durationMin: z.number().nullable().describe('Durata indicativa in minuti'),
   temperatureC: z.number().nullable(),
   timerMinutes: z.number().nullable().describe('Minuti del timer se il passaggio ha un tempo da cronometrare (cottura, riposo)'),
-  timerLabel: z.string().nullable().describe('Etichetta breve del timer, es. "Lievitazione"'),
+  timerLabel: z.string().describe('Etichetta breve del timer, es. "Lievitazione"; stringa vuota se non c\'è timer'),
   equipment: z.array(z.string()).describe('Attrezzatura usata, es. ["padella", "teglia 24 cm"]'),
-  section: z.string().nullable(),
+  section: z.string().describe('Sezione della ricetta, stringa vuota se nessuna'),
   parallelWithStep: z
     .number()
     .nullable()
@@ -44,15 +46,15 @@ export const aiStepSchema = z.object({
 
 export const aiRecipeSchema = z.object({
   title: z.string(),
-  description: z.string().nullable(),
+  description: z.string().describe('Breve descrizione, stringa vuota se assente'),
   servings: z.number().describe('Porzioni per cui sono scritte le quantità; stima se non indicate'),
   yieldAmount: z.number().nullable().describe('Resa totale se ha senso (es. grammi di impasto), altrimenti null'),
-  yieldUnit: z.string().nullable(),
+  yieldUnit: z.string().describe('Unità della resa (es. "g"), stringa vuota se non c\'è resa'),
   tags: z.array(z.string()).describe('Tag brevi in minuscolo: primi, dolci, lievitati, veloce, vegetariano…'),
   ingredients: z.array(aiIngredientSchema),
   steps: z.array(aiStepSchema),
-  notes: z.string().nullable().describe('Consigli e varianti presenti nella fonte'),
-  source: z.string().nullable().describe('Fonte, se nota (sito, libro, autore)'),
+  notes: z.string().describe('Consigli e varianti presenti nella fonte, stringa vuota se assenti'),
+  source: z.string().describe('Fonte, se nota (sito, libro, autore), altrimenti stringa vuota'),
 })
 
 export type AiRecipe = z.infer<typeof aiRecipeSchema>
@@ -81,7 +83,7 @@ export function aiToRecipe(ai: AiRecipe, base?: Partial<Pick<Recipe, 'id' | 'cre
         scaling = undefined
         break
       case 'bakersPercent':
-        scaling = { mode: 'bakersPercent', percent: i.bakersPercent ?? 0, of: i.bakersOf ?? '' }
+        scaling = { mode: 'bakersPercent', percent: i.bakersPercent ?? 0, of: i.bakersOf }
         break
       default:
         scaling = { mode: i.scaling }
