@@ -3,7 +3,7 @@ import { pane } from './fixtures'
 import type { Recipe } from '../model'
 import { buildShoppingList, shoppingListText } from '../shopping'
 import { planBackwards, parseReadyAt, stepMinutes, upcomingStarts } from '../schedule'
-import { DOUGH_TYPES, doughTypeOf, doughWeight, equivalentRound, factorFromPan, factorFromPans, factorFromPieces, formatPan, panArea, recipeDoughDensity, splitDough, totalPanArea } from '../pan'
+import { DOUGH_TYPES, doughTypeOf, factorFromMolds, moldedTypeOf, moldsFromDough, doughWeight, equivalentRound, factorFromPan, factorFromPans, factorFromPieces, formatPan, panArea, recipeDoughDensity, splitDough, totalPanArea } from '../pan'
 import { checkRecipe } from '../lint'
 import { decodeRecipeFromLink, encodeRecipeForLink, recipeToText } from '../share'
 import { scaleRecipe } from '../scaling'
@@ -228,5 +228,27 @@ describe('condivisione', () => {
     expect('favorite' in back).toBe(false)
     expect(decodeRecipeFromLink('non-un-link')).toBeNull()
     expect(decodeRecipeFromLink(btoa('{"title":1}'))).toBeNull()
+  })
+})
+
+describe('lievitati da stampo', () => {
+  const panettone: Recipe = { ...pane, title: 'Panettone classico', yield: { amount: 1100, unit: 'g' } }
+  it('riconosce panettone, pandoro e colomba', () => {
+    expect(moldedTypeOf(panettone)).toBe('panettone')
+    expect(moldedTypeOf({ ...pane, title: 'Pandoro di Verona' })).toBe('pandoro')
+    expect(moldedTypeOf({ ...pane, title: 'Colomba pasquale' })).toBe('colomba')
+    expect(moldedTypeOf(pane)).toBeUndefined()
+  })
+  it('stampo da 1 kg = 1,1 kg di impasto', () => {
+    expect(factorFromMolds(panettone, [{ grams: 1000, count: 1 }])).toBeCloseTo(1)
+    expect(factorFromMolds(panettone, [{ grams: 500, count: 2 }, { grams: 100, count: 5 }])).toBeCloseTo(1.5)
+    expect(factorFromMolds(panettone, [])).toBeNull()
+  })
+  it('quanti stampi escono dall\'impasto', () => {
+    expect(moldsFromDough(1100, 1000)).toEqual({ count: 1, leftover: 0 })
+    expect(moldsFromDough(2199.9, 1000).count).toBe(2) // fattore arrotondato nell'URL
+    const r = moldsFromDough(2000, 750)
+    expect(r.count).toBe(2)
+    expect(r.leftover).toBeCloseTo(350)
   })
 })

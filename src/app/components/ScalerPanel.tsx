@@ -5,15 +5,21 @@ import {
   doughTypeOf,
   doughWeight,
   factorFromPans,
+  factorFromMolds,
   factorFromPieces,
   formatFactor,
   formatPan,
   formatQuantity,
   isFactorFeasible,
+  MOLD_OVERFILL,
+  MOLD_SIZES,
+  moldedTypeOf,
+  moldsFromDough,
   recipeDoughDensity,
   splitDough,
   suggestFeasibleFactors,
   type DoughType,
+  type MoldCount,
   type Pan,
   type PanCount,
   type Recipe,
@@ -116,7 +122,7 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
         </form>
       )}
 
-      <PanPlanner recipe={recipe} factor={scaled.factor} onFactor={onFactor} />
+      {moldedTypeOf(recipe) ? <MoldPlanner recipe={recipe} factor={scaled.factor} onFactor={onFactor} /> : <PanPlanner recipe={recipe} factor={scaled.factor} onFactor={onFactor} />}
 
       <p className="inline-flex items-start gap-1.5 text-xs text-muted">
         <Icon name="edit" size={14} className="mt-0.5" />
@@ -322,5 +328,78 @@ function PanPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: numb
         </form>
       )}
     </div>
+  )
+}
+
+const MOLD_NAMES = { panettone: ['panettone', 'panettoni'], pandoro: ['pandoro', 'pandori'], colomba: ['colomba', 'colombe'] } as const
+
+const moldLabel = (g: number) => (g >= 1000 ? `${decimal(g / 1000)} kg` : `${g} g`)
+
+/**
+ * Panettone, pandoro e colomba: si ragiona in stampi venduti per peso del prodotto
+ * finito, con il 10 % di impasto in più per il calo in cottura.
+ */
+function MoldPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: number; onFactor: (f: number) => void }) {
+  const type = moldedTypeOf(recipe)!
+  const dough = doughWeight(recipe)
+  const nextKey = useRef(1)
+  const [rows, setRows] = useState<{ key: number; count: string; grams: number }[]>([{ key: 0, count: '1', grams: 1000 }])
+  const id = useId()
+  if (!dough) return null
+
+  const [one, many] = MOLD_NAMES[type]
+  const molds: MoldCount[] = rows.map((r) => ({ grams: r.grams, count: Number(r.count) }))
+  const ready = molds.length > 0 && molds.every((m) => m.count > 0)
+  const current = dough * factor
+  const fits = ([1000, 750, 500] as const).map((g) => ({ g, ...moldsFromDough(current, g) })).filter((f) => f.count > 0)
+  const update = (key: number, patch: Partial<{ count: string; grams: number }>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+
+  return (
+    <form
+      className="rule space-y-2 pt-3"
+      aria-labelledby={`${id}-molds`}
+      onSubmit={(e) => {
+        e.preventDefault()
+        const f = factorFromMolds(recipe, molds)
+        if (f) onFactor(f)
+      }}
+    >
+      <p id={`${id}-molds`} className="text-sm text-muted">
+        Stampi
+      </p>
+      {rows.map((r, idx) => (
+        <div key={r.key} className="flex items-center gap-1.5">
+          <input type="number" min={1} step={1} className="w-14 shrink-0 px-1 py-1.5 text-center" aria-label={`Numero di stampi, riga ${idx + 1}`} value={r.count} onChange={(e) => update(r.key, { count: e.target.value })} />
+          <label htmlFor={`${id}-size-${r.key}`} className="text-sm text-muted">
+            da
+          </label>
+          <select id={`${id}-size-${r.key}`} className="w-28 shrink-0 px-2 py-1.5 text-sm" value={r.grams} onChange={(e) => update(r.key, { grams: Number(e.target.value) })}>
+            {MOLD_SIZES.map((g) => (
+              <option key={g} value={g}>
+                {moldLabel(g)}
+              </option>
+            ))}
+          </select>
+          {rows.length > 1 && (
+            <button type="button" className="btn-ghost h-9 w-9 shrink-0 p-0" aria-label={`Togli la riga ${idx + 1}`} onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}>
+              <Icon name="close" size={16} />
+            </button>
+          )}
+        </div>
+      ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn-ghost min-h-9 px-2 py-1 text-sm" onClick={() => setRows((rs) => [...rs, { key: nextKey.current++, count: '1', grams: 500 }])}>
+          <Icon name="plus" size={16} /> Aggiungi stampo
+        </button>
+        <button className="btn-secondary min-h-9 px-3 py-1.5 text-sm" type="submit" disabled={!ready}>
+          Applica
+        </button>
+      </div>
+      <p className="text-sm">
+        Con queste dosi hai <span className="qty">{grams(current)}</span> di impasto
+        {fits.length > 0 ? `: ${fits.map((f) => `${f.count} ${f.count > 1 ? many : one} da ${moldLabel(f.g)}`).join(', oppure ')}.` : `, meno di uno stampo da 500 g.`}
+      </p>
+      <p className="text-xs text-muted">Lo stampo indica il peso del prodotto finito: si mette il {Math.round(MOLD_OVERFILL * 100)} % di impasto in più, che si perde in cottura (1 kg di stampo, 1,1 kg di impasto).</p>
+    </form>
   )
 }

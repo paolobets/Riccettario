@@ -134,3 +134,43 @@ export function splitDough(totalDough: number, pans: PanCount[]): { pan: Pan; co
     .filter((p) => isValidPan(p.pan) && p.count > 0)
     .map((p) => ({ pan: p.pan, count: p.count, grams: (totalDough * panArea(p.pan)) / area }))
 }
+
+/** Lievitati cotti in stampi di carta venduti per peso del prodotto finito. */
+export type MoldedType = 'panettone' | 'pandoro' | 'colomba'
+
+export function moldedTypeOf(recipe: Recipe): MoldedType | undefined {
+  const text = [recipe.title, ...recipe.tags].join(' ').toLowerCase()
+  if (/panetton|veneziana/.test(text)) return 'panettone'
+  if (/pandor/.test(text)) return 'pandoro'
+  if (/colomb/.test(text)) return 'colomba'
+  return undefined
+}
+
+/** Formati di stampo in commercio, in grammi di prodotto finito. */
+export const MOLD_SIZES = [100, 250, 500, 750, 1000] as const
+
+/** Impasto in più rispetto al peso dello stampo: copre il calo in cottura (1 kg → 1,1 kg di impasto). */
+export const MOLD_OVERFILL = 0.1
+
+/** Uno o più stampi uguali: "2 da 500 g". */
+export interface MoldCount {
+  grams: number
+  count: number
+}
+
+/** Fattore per riempire gli stampi scelti, con l'impasto in più per il calo. */
+export function factorFromMolds(recipe: Recipe, molds: MoldCount[], overfill = MOLD_OVERFILL): number | null {
+  const dough = doughWeight(recipe)
+  const needed = molds.reduce((sum, m) => (m.grams > 0 && m.count > 0 ? sum + m.grams * m.count : sum), 0) * (1 + overfill)
+  if (!dough || needed <= 0) return null
+  return needed / dough
+}
+
+/** Quanti stampi da `grams` si riempiono con `dough` grammi di impasto, e quanto avanza. */
+export function moldsFromDough(dough: number, grams: number, overfill = MOLD_OVERFILL): { count: number; leftover: number } {
+  const each = grams * (1 + overfill)
+  if (!(dough > 0) || !(each > 0)) return { count: 0, leftover: 0 }
+  // tolleranza dell'1 % per i fattori arrotondati nell'URL
+  const count = Math.floor(dough / each + 0.01)
+  return { count, leftover: Math.max(0, dough - count * each) }
+}
