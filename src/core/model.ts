@@ -106,6 +106,27 @@ export interface Yield {
 /** Teglia o stampo per cui è scritta la ricetta: cambiandola il fattore è il rapporto tra le aree. */
 export type Pan = { shape: 'round'; diameterCm: number } | { shape: 'rect'; widthCm: number; lengthCm: number }
 
+/** Porzioni (persone), teglie, stampi da lievitati o pezzi da tot grammi (pizze, panetti). */
+export type DosingMode = 'servings' | 'pans' | 'molds' | 'pieces'
+
+/** Tipi di impasto con il loro indice di carico, vedi `DOUGH_TYPES` in pan.ts. */
+export type DoughType = 'pizzaTeglia' | 'pizzaAlta' | 'napoletana' | 'romana' | 'focaccia' | 'genovese' | 'pinsa'
+
+export interface Dosing {
+  mode: DosingMode
+  /** Solo per le teglie: indice di carico da usare se la ricetta non ha una teglia. */
+  dough?: DoughType
+  /** Solo per i pezzi: grammi di impasto per pezzo. */
+  pieceGrams?: number
+}
+
+export const DOSING_MODE_LABELS: Record<DosingMode, string> = {
+  servings: 'Porzioni',
+  pans: 'Teglie',
+  molds: 'Stampi',
+  pieces: 'Pezzi',
+}
+
 /** Dati dell'etichetta da stampare, oltre a ciò che si ricava dagli ingredienti. */
 export interface LabelInfo {
   /** Allergeni confermati a mano; se assente valgono quelli riconosciuti dai nomi. */
@@ -129,6 +150,8 @@ export interface Recipe {
   yield?: Yield
   /** Teglia di riferimento, opzionale: abilita la scalatura per teglia. */
   pan?: Pan
+  /** Come si ragiona sulle dosi, scelto da chi scrive la ricetta. Se manca si deduce dal titolo. */
+  dosing?: Dosing
   /** Segnata con la stella. */
   favorite?: boolean
   label?: LabelInfo

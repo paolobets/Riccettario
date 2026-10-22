@@ -12,6 +12,9 @@ const sample: AiRecipe = {
   panShape: 'rect',
   panWidthCm: 30,
   panLengthCm: 0,
+  dosingMode: 'pans',
+  doughType: 'focaccia',
+  pieceGrams: 0,
   tags: ['Lievitati', ' base '],
   ingredients: [
     { id: 'Farina 0', name: 'farina 0', amount: 500, unit: 'g', scaling: 'linear', bakersPercent: null, bakersOf: '', note: '', section: '', optional: false },
@@ -68,6 +71,8 @@ describe('aiToRecipe', () => {
     expect(recipe.yield).toEqual({ amount: 900, unit: 'g' })
     expect(recipe.source).toBe('nonna')
     expect(recipe.pan).toEqual({ shape: 'rect', widthCm: 30, lengthCm: 30 })
+    expect(recipe.dosing).toEqual({ mode: 'pans', dough: 'focaccia', pieceGrams: undefined })
+    expect(aiToRecipe({ ...sample, dosingMode: 'pieces', doughType: '', pieceGrams: 80 }).recipe.dosing).toEqual({ mode: 'pieces', dough: undefined, pieceGrams: 80 })
     expect(aiToRecipe({ ...sample, panShape: 'round', panWidthCm: 24 }).recipe.pan).toEqual({ shape: 'round', diameterCm: 24 })
     expect(aiToRecipe({ ...sample, panShape: '', panWidthCm: 0 }).recipe.pan).toBeUndefined()
   })

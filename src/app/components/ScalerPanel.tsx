@@ -1,6 +1,9 @@
 import { useId, useRef, useState } from 'react'
 import Icon from './Icon'
 import {
+  DEFAULT_PIECE_GRAMS,
+  DOSING_MODE_LABELS,
+  dosingOf,
   DOUGH_TYPES,
   doughTypeOf,
   doughWeight,
@@ -11,6 +14,7 @@ import {
   formatPan,
   formatQuantity,
   isFactorFeasible,
+  isValidPan,
   MOLD_OVERFILL,
   MOLD_SIZES,
   moldedTypeOf,
@@ -19,6 +23,7 @@ import {
   splitDough,
   suggestFeasibleFactors,
   type DoughType,
+  type DosingMode,
   type MoldCount,
   type Pan,
   type PanCount,
@@ -49,6 +54,10 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
   const feasible = isFactorFeasible(recipe, scaled.factor)
   const suggestions = feasible ? [] : suggestFeasibleFactors(recipe, scaled.factor).slice(0, 2)
   const isScaled = Math.abs(scaled.factor - 1) > 1e-9
+  const declared = dosingOf(recipe)
+  const [mode, setMode] = useState<DosingMode>(declared.mode)
+  const hasDough = doughWeight(recipe) !== null
+  const modes = (Object.keys(DOSING_MODE_LABELS) as DosingMode[]).filter((m) => m === 'servings' || m === declared.mode || (m === 'pans' ? hasDough || isValidPan(recipe.pan) : hasDough))
 
   return (
     <section className="card space-y-3" aria-labelledby={`${servingsId}-title`}>
@@ -66,6 +75,24 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
         </div>
       </div>
 
+      {modes.length > 1 && (
+        <div className="grid grid-flow-col gap-1 rounded-xl bg-surface-2 p-1" role="radiogroup" aria-label="Dosi per">
+          {modes.map((m) => (
+            <button
+              key={m}
+              role="radio"
+              aria-checked={mode === m}
+              className={`min-h-9 rounded-lg px-2 py-1.5 text-sm font-medium transition ${mode === m ? 'bg-surface text-fg shadow-sm' : 'text-muted'}`}
+              onClick={() => setMode(m)}
+            >
+              {DOSING_MODE_LABELS[m]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mode === 'servings' && (
+      <>
       <div className="flex flex-wrap items-center gap-3">
         <label htmlFor={servingsId} className="w-full text-sm text-muted min-[360px]:w-24">
           Porzioni
@@ -122,7 +149,12 @@ export default function ScalerPanel({ recipe, scaled, onServings, onYield, onFac
         </form>
       )}
 
-      {moldedTypeOf(recipe) ? <MoldPlanner recipe={recipe} factor={scaled.factor} onFactor={onFactor} /> : <PanPlanner recipe={recipe} factor={scaled.factor} onFactor={onFactor} />}
+      </>
+      )}
+
+      {mode === 'pans' && <PanPlanner recipe={recipe} dough={declared.dough} factor={scaled.factor} onFactor={onFactor} />}
+      {mode === 'molds' && <MoldPlanner recipe={recipe} factor={scaled.factor} onFactor={onFactor} />}
+      {mode === 'pieces' && <PiecesPlanner recipe={recipe} pieceGrams={declared.pieceGrams} factor={scaled.factor} onFactor={onFactor} />}
 
       <p className="inline-flex items-start gap-1.5 text-xs text-muted">
         <Icon name="edit" size={14} className="mt-0.5" />
@@ -174,12 +206,9 @@ function rowToPan(r: PanRow): PanCount | null {
 const decimal = (n: number, digits = 2) => n.toLocaleString('it-IT', { maximumFractionDigits: digits })
 const grams = (g: number) => formatQuantity({ amount: Math.round(g / 5) * 5, unit: 'g' })
 
-/**
- * Teglie e pizze: una o più teglie (1 da 40×40, oppure 2 da 15×25) o un numero di
- * panetti. Compare se la ricetta ha una teglia o è un impasto da teglia.
- */
-function PanPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: number; onFactor: (f: number) => void }) {
-  const type = doughTypeOf(recipe)
+/** Una o più teglie (1 da 40×40, oppure 2 da 15×25): con la teglia della ricetta o con l'indice di carico. */
+function PanPlanner({ recipe, dough: declaredDough, factor, onFactor }: { recipe: Recipe; dough?: DoughType; factor: number; onFactor: (f: number) => void }) {
+  const type = declaredDough ?? doughTypeOf(recipe)
   const dough = doughWeight(recipe)
   const ownDensity = recipeDoughDensity(recipe)
   const nextKey = useRef(1)
@@ -187,10 +216,8 @@ function PanPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: numb
   const [kind, setKind] = useState<DoughType | ''>(type ?? 'pizzaTeglia')
   const [density, setDensity] = useState(() => decimal(DOUGH_TYPES[type ?? 'pizzaTeglia'].gPerCm2))
   const [applied, setApplied] = useState<{ pans: PanCount[]; factor: number } | null>(null)
-  const [pieces, setPieces] = useState('')
-  const [pieceGrams, setPieceGrams] = useState('250')
   const id = useId()
-  if (!recipe.pan && !(type && dough)) return null
+  if (!recipe.pan && !dough) return <MissingDough />
 
   const pans = rows.map(rowToPan)
   const ready = pans.length > 0 && pans.every(Boolean)
@@ -199,7 +226,7 @@ function PanPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: numb
   const showSplit = applied && Math.abs(applied.factor - factor) < 1e-3 && dough
 
   return (
-    <div className="rule space-y-3 pt-3">
+    <div className="space-y-3">
       <form
         className="space-y-2"
         aria-labelledby={`${id}-pan`}
@@ -304,29 +331,6 @@ function PanPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: numb
         )}
       </form>
 
-      {type && dough && (
-        <form
-          className="flex flex-wrap items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            const f = factorFromPieces(recipe, Number(pieces), Number(pieceGrams))
-            if (f) onFactor(f)
-          }}
-        >
-          <label htmlFor={`${id}-pieces`} className="text-sm text-muted">
-            {type === 'focaccia' ? 'Panetti' : type === 'pinsa' ? 'Pinse' : 'Pizze'}
-          </label>
-          <input id={`${id}-pieces`} type="number" min={1} step={1} className="w-16 min-w-0 px-2 py-1.5 text-center" value={pieces} placeholder={String(Math.max(1, Math.round(dough / Number(pieceGrams || 250))))} onChange={(e) => setPieces(e.target.value)} />
-          <label htmlFor={`${id}-grams`} className="text-sm text-muted">
-            da
-          </label>
-          <input id={`${id}-grams`} type="number" min={1} step="any" className="w-20 min-w-0 px-2 py-1.5 text-center" value={pieceGrams} onChange={(e) => setPieceGrams(e.target.value)} />
-          <span className="text-sm text-muted">g</span>
-          <button className="btn-secondary min-h-9 px-3 py-1.5 text-sm" type="submit" disabled={!(Number(pieces) > 0 && Number(pieceGrams) > 0)}>
-            Applica
-          </button>
-        </form>
-      )}
     </div>
   )
 }
@@ -340,12 +344,12 @@ const moldLabel = (g: number) => (g >= 1000 ? `${decimal(g / 1000)} kg` : `${g} 
  * finito, con il 10 % di impasto in più per il calo in cottura.
  */
 function MoldPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: number; onFactor: (f: number) => void }) {
-  const type = moldedTypeOf(recipe)!
+  const type = moldedTypeOf(recipe) ?? 'panettone'
   const dough = doughWeight(recipe)
   const nextKey = useRef(1)
   const [rows, setRows] = useState<{ key: number; count: string; grams: number }[]>([{ key: 0, count: '1', grams: 1000 }])
   const id = useId()
-  if (!dough) return null
+  if (!dough) return <MissingDough />
 
   const [one, many] = MOLD_NAMES[type]
   const molds: MoldCount[] = rows.map((r) => ({ grams: r.grams, count: Number(r.count) }))
@@ -356,7 +360,7 @@ function MoldPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: num
 
   return (
     <form
-      className="rule space-y-2 pt-3"
+      className="space-y-2"
       aria-labelledby={`${id}-molds`}
       onSubmit={(e) => {
         e.preventDefault()
@@ -400,6 +404,50 @@ function MoldPlanner({ recipe, factor, onFactor }: { recipe: Recipe; factor: num
         {fits.length > 0 ? `: ${fits.map((f) => `${f.count} ${f.count > 1 ? many : one} da ${moldLabel(f.g)}`).join(', oppure ')}.` : `, meno di uno stampo da 500 g.`}
       </p>
       <p className="text-xs text-muted">Lo stampo indica il peso del prodotto finito: si mette il {Math.round(MOLD_OVERFILL * 100)} % di impasto in più, che si perde in cottura (1 kg di stampo, 1,1 kg di impasto).</p>
+    </form>
+  )
+}
+
+function MissingDough() {
+  return <p className="text-sm text-muted">Per calcolare le dosi serve il peso dell'impasto: indica la resa in grammi o le quantità in grammi, oppure la teglia della ricetta, da Modifica.</p>
+}
+
+/** Pizze, panetti, biscotti: tanti pezzi da tot grammi di impasto. */
+function PiecesPlanner({ recipe, pieceGrams: declaredGrams, factor, onFactor }: { recipe: Recipe; pieceGrams?: number; factor: number; onFactor: (f: number) => void }) {
+  const dough = doughWeight(recipe)
+  const [pieceGrams, setPieceGrams] = useState(String(declaredGrams ?? DEFAULT_PIECE_GRAMS))
+  const each = Number(pieceGrams)
+  const current = dough ? Math.round((dough * factor) / (each > 0 ? each : DEFAULT_PIECE_GRAMS)) : 0
+  const [pieces, setPieces] = useState('')
+  const id = useId()
+  if (!dough) return <MissingDough />
+
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault()
+        const f = factorFromPieces(recipe, Number(pieces), each)
+        if (f) onFactor(f)
+      }}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor={`${id}-pieces`} className="text-sm text-muted">
+          Pezzi
+        </label>
+        <input id={`${id}-pieces`} type="number" min={1} step={1} className="w-16 min-w-0 px-2 py-1.5 text-center" value={pieces} placeholder={String(Math.max(1, current))} onChange={(e) => setPieces(e.target.value)} />
+        <label htmlFor={`${id}-grams`} className="text-sm text-muted">
+          da
+        </label>
+        <input id={`${id}-grams`} type="number" min={1} step="any" className="w-20 min-w-0 px-2 py-1.5 text-center" value={pieceGrams} onChange={(e) => setPieceGrams(e.target.value)} />
+        <span className="text-sm text-muted">g</span>
+        <button className="btn-secondary min-h-9 px-3 py-1.5 text-sm" type="submit" disabled={!(Number(pieces) > 0 && each > 0)}>
+          Applica
+        </button>
+      </div>
+      <p className="text-xs text-muted">
+        Con queste dosi hai {grams(dough * factor)} di impasto, circa {current} {current === 1 ? 'pezzo' : 'pezzi'} da {each > 0 ? each : DEFAULT_PIECE_GRAMS} g.
+      </p>
     </form>
   )
 }

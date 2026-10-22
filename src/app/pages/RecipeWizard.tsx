@@ -16,6 +16,11 @@ import {
   wouldCycle,
   isMassUnit,
   isVolumeUnit,
+  dosingOf,
+  DOSING_MODE_LABELS,
+  DOUGH_TYPES,
+  type DosingMode,
+  type DoughType,
   type Pan,
   type Ingredient,
   type Recipe,
@@ -77,6 +82,9 @@ function fromRecipe(r: Recipe) {
     panShape: (r.pan?.shape ?? '') as Pan['shape'] | '',
     panA: r.pan ? String(r.pan.shape === 'round' ? r.pan.diameterCm : r.pan.widthCm) : '',
     panB: r.pan?.shape === 'rect' ? String(r.pan.lengthCm) : '',
+    dosingMode: dosingOf(r).mode as DosingMode,
+    dough: (dosingOf(r).dough ?? '') as DoughType | '',
+    pieceGrams: dosingOf(r).pieceGrams ? String(dosingOf(r).pieceGrams) : '',
     tags: r.tags.join(', '),
     notes: r.notes ?? '',
     source: r.source ?? '',
@@ -171,6 +179,11 @@ function toRecipe(d: Draft, base: Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>
     servings: num(d.servings) ?? 1,
     yield: yieldAmount ? { amount: yieldAmount, unit: d.yieldUnit.trim() || 'g' } : undefined,
     pan,
+    dosing: {
+      mode: d.dosingMode,
+      dough: d.dosingMode === 'pans' && d.dough ? d.dough : undefined,
+      pieceGrams: d.dosingMode === 'pieces' ? num(d.pieceGrams) : undefined,
+    },
     tags: d.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
     sections: sections.length ? sections : undefined,
     ingredients,
@@ -302,6 +315,13 @@ function emptyRecipe(): Recipe {
   return { id: newId('r'), title: '', servings: 4, tags: [], ingredients: [], steps: [], createdAt: now, updatedAt: now }
 }
 
+const DOSING_MODE_HINTS: Record<DosingMode, string> = {
+  servings: 'porzioni o persone',
+  pans: 'teglie (pizza, focaccia, torte)',
+  molds: 'stampi (panettone, pandoro, colomba)',
+  pieces: 'pezzi da tot grammi (pizze, panetti)',
+}
+
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
     <label className="block">
@@ -343,7 +363,35 @@ function PhaseInfo({ draft, set, isNew }: { draft: Draft; set: (p: Partial<Draft
           <input className="w-full" value={draft.tags} onChange={(e) => set({ tags: e.target.value })} />
         </Field>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Dosi per" hint="Come vuoi adattare le quantità">
+          <select className="w-full" value={draft.dosingMode} onChange={(e) => set({ dosingMode: e.target.value as DosingMode })}>
+            {(Object.keys(DOSING_MODE_LABELS) as DosingMode[]).map((m) => (
+              <option key={m} value={m}>
+                {DOSING_MODE_HINTS[m]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {draft.dosingMode === 'pans' && (
+          <Field label="Tipo di impasto" hint="Grammi per cm² se la ricetta non ha una teglia">
+            <select className="w-full" value={draft.dough} onChange={(e) => set({ dough: e.target.value as Draft['dough'] })}>
+              <option value="">da riconoscere dal titolo</option>
+              {(Object.keys(DOUGH_TYPES) as DoughType[]).map((k) => (
+                <option key={k} value={k}>
+                  {DOUGH_TYPES[k].label}, {DOUGH_TYPES[k].gPerCm2.toLocaleString('it-IT')} g/cm²
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {draft.dosingMode === 'pieces' && (
+          <Field label="Grammi per pezzo" hint="Es. 250 per un panetto da pizza">
+            <input className="w-full" type="number" min={1} step="any" value={draft.pieceGrams} onChange={(e) => set({ pieceGrams: e.target.value })} />
+          </Field>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Field label="Teglia (opz.)" hint="Per riscalare cambiando teglia">
           <select className="w-full" value={draft.panShape} onChange={(e) => set({ panShape: e.target.value as Draft['panShape'] })}>
             <option value="">nessuna</option>

@@ -12,6 +12,7 @@ interface Recipe {
   servings: number            // porzioni per cui sono scritte le quantità
   yield?: { amount: number; unit: string }   // resa totale di riferimento (es. 850 g)
   pan?: { shape: 'round'; diameterCm: number } | { shape: 'rect'; widthCm: number; lengthCm: number }  // teglia di riferimento
+  dosing?: { mode: 'servings' | 'pans' | 'molds' | 'pieces'; dough?: DoughType; pieceGrams?: number }  // modalità delle dosi
   favorite?: boolean          // stella
   label?: LabelInfo           // dati dell'etichetta: allergeni confermati, peso netto, durata, conservazione, produttore
   tags: string[]
@@ -58,6 +59,8 @@ Dato un fattore F (es. 1,5 per passare da 4 a 6 porzioni):
 Dopo la scalatura le quantità lineari e sub-lineari vengono **arrotondate a misure pratiche** (`roundPractical` in `units.ts`): grammi e millilitri a 0,5 / 1 / 5 / 10 secondo la grandezza, cucchiai a quarti, tazze a ottavi. Gli ingredienti discreti, fissi e q.b. non vengono arrotondati ulteriormente.
 
 ### Come si ricava il fattore
+
+La **modalità delle dosi** (`dosing`) la sceglie chi scrive la ricetta, in Modifica, o la propone l'import AI: porzioni, teglie (con il tipo di impasto), stampi o pezzi da tot grammi. Il pannello Dosi apre quella modalità e permette di passare alle altre per cui ci sono i dati. Le ricette senza `dosing` ricevono una proposta da `dosingOf`: stampi se il titolo nomina panettone, pandoro o colomba, teglie se c'è una teglia o il titolo nomina pizza, focaccia o pinsa, altrimenti porzioni.
 
 - **Porzioni**: F = porzioni richieste / porzioni della ricetta.
 - **Resa**: F = resa richiesta / resa della ricetta (serve `yield`).

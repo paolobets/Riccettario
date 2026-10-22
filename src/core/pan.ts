@@ -1,4 +1,4 @@
-import type { Pan, Recipe } from './model'
+import type { Dosing, DoughType, Pan, Recipe } from './model'
 import { toBase } from './units'
 
 /** Area in cm², quello che conta per spessore e cottura. */
@@ -49,7 +49,7 @@ export function totalPanArea(pans: PanCount[]): number {
  * Valori medi delle schede professionali e dei calcolatori, da correggere a gusto (±10 %):
  * 1,1–1,3 kg per una teglia 60×40 di pizza in teglia, circa 500 g per una 30×40 di genovese.
  */
-export const DOUGH_TYPES = {
+export const DOUGH_TYPES: Record<DoughType, { label: string; gPerCm2: number }> = {
   pizzaTeglia: { label: 'pizza in teglia', gPerCm2: 0.5 },
   pizzaAlta: { label: 'pizza alta e soffice', gPerCm2: 0.6 },
   napoletana: { label: 'pizza tonda napoletana', gPerCm2: 0.31 },
@@ -57,9 +57,7 @@ export const DOUGH_TYPES = {
   focaccia: { label: 'focaccia alta', gPerCm2: 0.6 },
   genovese: { label: 'focaccia genovese', gPerCm2: 0.42 },
   pinsa: { label: 'pinsa', gPerCm2: 0.4 },
-} as const
-
-export type DoughType = keyof typeof DOUGH_TYPES
+}
 
 /** Riconosce dal titolo o dai tag se la ricetta è un impasto da teglia, e di che tipo. */
 export function doughTypeOf(recipe: Recipe): DoughType | undefined {
@@ -173,4 +171,19 @@ export function moldsFromDough(dough: number, grams: number, overfill = MOLD_OVE
   // tolleranza dell'1 % per i fattori arrotondati nell'URL
   const count = Math.floor(dough / each + 0.01)
   return { count, leftover: Math.max(0, dough - count * each) }
+}
+
+/** Grammi per pezzo proposti quando la ricetta non li indica: un panetto da pizza. */
+export const DEFAULT_PIECE_GRAMS = 250
+
+/**
+ * Modalità delle dosi: quella scelta nella ricetta, altrimenti una proposta ricavata
+ * da titolo e teglia (stampi per panettone e simili, teglie per pizze e focacce).
+ */
+export function dosingOf(recipe: Recipe): Dosing {
+  if (recipe.dosing) return recipe.dosing
+  if (moldedTypeOf(recipe)) return { mode: 'molds' }
+  const dough = doughTypeOf(recipe)
+  if (isValidPan(recipe.pan) || dough) return { mode: 'pans', dough }
+  return { mode: 'servings' }
 }

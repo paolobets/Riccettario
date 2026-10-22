@@ -53,6 +53,15 @@ export const aiRecipeSchema = z.object({
   panShape: z.enum(['', 'round', 'rect']).describe('Teglia o stampo per cui sono scritte le dosi: round tonda, rect rettangolare o quadrata, stringa vuota se la ricetta non ne indica una'),
   panWidthCm: z.number().describe('Diametro della teglia tonda o primo lato della rettangolare, in cm; 0 se non c\'è teglia'),
   panLengthCm: z.number().describe('Secondo lato della teglia rettangolare (uguale al primo se quadrata), in cm; 0 per la tonda o senza teglia'),
+  dosingMode: z
+    .enum(['servings', 'pans', 'molds', 'pieces'])
+    .describe(
+      'Come si adattano le dosi: servings per porzioni o persone; pans per impasti e dolci in teglia (pizza in teglia, focaccia, torte); molds per lievitati in stampo venduto a peso (panettone, pandoro, colomba); pieces per tanti pezzi uguali da tot grammi (pizze tonde, panetti, pinse).',
+    ),
+  doughType: z
+    .enum(['', 'pizzaTeglia', 'pizzaAlta', 'napoletana', 'romana', 'focaccia', 'genovese', 'pinsa'])
+    .describe('Solo con dosingMode=pans: tipo di impasto (pizzaTeglia, pizzaAlta, napoletana, romana tonda sottile, focaccia alta, genovese, pinsa), altrimenti stringa vuota'),
+  pieceGrams: z.number().describe('Solo con dosingMode=pieces: grammi di impasto per pezzo indicati dalla fonte o stimati, altrimenti 0'),
   tags: z.array(z.string()).describe('Tag brevi in minuscolo: primi, dolci, lievitati, veloce, vegetariano…'),
   ingredients: z.array(aiIngredientSchema),
   steps: z.array(aiStepSchema),
@@ -164,6 +173,11 @@ export function aiToRecipe(ai: AiRecipe, base?: Partial<Pick<Recipe, 'id' | 'cre
     servings: ai.servings > 0 ? ai.servings : 4,
     yield: ai.yieldAmount && ai.yieldAmount > 0 ? { amount: ai.yieldAmount, unit: ai.yieldUnit?.trim() || 'g' } : undefined,
     pan: aiPan(ai),
+    dosing: {
+      mode: ai.dosingMode,
+      dough: ai.dosingMode === 'pans' && ai.doughType ? ai.doughType : undefined,
+      pieceGrams: ai.dosingMode === 'pieces' && ai.pieceGrams > 0 ? ai.pieceGrams : undefined,
+    },
     tags: ai.tags.map((t) => t.trim().toLowerCase()).filter(Boolean),
     sections: sections.length ? sections : undefined,
     ingredients,

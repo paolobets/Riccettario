@@ -3,7 +3,7 @@ import { pane } from './fixtures'
 import type { Recipe } from '../model'
 import { buildShoppingList, shoppingListText } from '../shopping'
 import { planBackwards, parseReadyAt, stepMinutes, upcomingStarts } from '../schedule'
-import { DOUGH_TYPES, doughTypeOf, factorFromMolds, moldedTypeOf, moldsFromDough, doughWeight, equivalentRound, factorFromPan, factorFromPans, factorFromPieces, formatPan, panArea, recipeDoughDensity, splitDough, totalPanArea } from '../pan'
+import { DOUGH_TYPES, dosingOf, doughTypeOf, factorFromMolds, moldedTypeOf, moldsFromDough, doughWeight, equivalentRound, factorFromPan, factorFromPans, factorFromPieces, formatPan, panArea, recipeDoughDensity, splitDough, totalPanArea } from '../pan'
 import { checkRecipe } from '../lint'
 import { decodeRecipeFromLink, encodeRecipeForLink, recipeToText } from '../share'
 import { scaleRecipe } from '../scaling'
@@ -250,5 +250,18 @@ describe('lievitati da stampo', () => {
     const r = moldsFromDough(2000, 750)
     expect(r.count).toBe(2)
     expect(r.leftover).toBeCloseTo(350)
+  })
+})
+
+describe('modalità delle dosi', () => {
+  it('vince quella scelta nella ricetta, anche contro il titolo', () => {
+    expect(dosingOf({ ...pane, title: 'Panettone', dosing: { mode: 'servings' } })).toEqual({ mode: 'servings' })
+    expect(dosingOf({ ...pane, dosing: { mode: 'pieces', pieceGrams: 80 } })).toEqual({ mode: 'pieces', pieceGrams: 80 })
+  })
+  it('senza scelta la propone da titolo e teglia', () => {
+    expect(dosingOf({ ...pane, title: 'Pandoro' }).mode).toBe('molds')
+    expect(dosingOf({ ...pane, title: 'Focaccia' })).toEqual({ mode: 'pans', dough: 'focaccia' })
+    expect(dosingOf({ ...pane, pan: { shape: 'round', diameterCm: 24 } }).mode).toBe('pans')
+    expect(dosingOf(pane)).toEqual({ mode: 'servings' })
   })
 })

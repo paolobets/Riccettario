@@ -5,6 +5,7 @@ const STRUCTURE_RULES = `Regole della struttura:
 - Unità: converti in grammi o millilitri quando la fonte lo permette (1 tazza di farina ≈ 125 g, 1 tazza di liquidi ≈ 240 ml, 1 cucchiaio ≈ 15 ml, 1 cucchiaino ≈ 5 ml). Mantieni cucchiai e cucchiaini per piccole quantità.
 - Regole di scalatura: sale, spezie, erbe, lievito e aromi → sublinear. Uova e pezzi interi (fette, spicchi) → discrete con unità "". Ingredienti "q.b." → toTaste. Elementi che non cambiano con le dosi (una foglia di alloro) → fixed. Negli impasti lievitati usa bakersPercent per acqua, sale, olio e zucchero rispetto alla farina se le quantità lo permettono (calcola la percentuale).
 - Teglia: se la ricetta indica la teglia o lo stampo per cui sono scritte le dosi ("teglia 30×40", "tortiera da 24 cm"), compila panShape, panWidthCm e panLengthCm; altrimenti panShape vuoto e misure 0. Non metterla tra gli ingredienti.
+- Dosi: scegli dosingMode secondo come si ragiona su quella ricetta (porzioni, teglie, stampi o pezzi da tot grammi); con le teglie indica il doughType se è un impasto, con i pezzi i grammi per pezzo.
 - Passaggi: uno per azione, in ordine. Indica tipo, durata, temperatura, timer per cotture e riposi, attrezzatura. Se un passaggio si può fare durante un riposo o una cottura lunga precedente, indica parallelWithStep.
 - Non inventare: se un dato manca, lascia null (o la stringa vuota per i testi). Se le porzioni mancano, stimale e dillo nelle note.`
 
