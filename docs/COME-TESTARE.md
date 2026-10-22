@@ -76,6 +76,7 @@ Su pages.dev le ricette si sincronizzano tra i dispositivi in cui fai l'accesso.
 - [ ] *Importa → Sito*: incolla l'URL di una ricetta (Giallozafferano, Cucchiaio d'argento, un blog). Con il proxy configurato lo stato dice «Trovata "…", la strutturo»: la pagina è stata letta dai dati strutturati, costo di pochi centesimi. Senza proxy, o se la pagina non li espone, lo stato dice che la fa leggere all'AI. Se fallisce, segnalalo con l'URL usato.
 - [ ] Fai due domande di seguito sulla stessa ricetta: la seconda costa visibilmente meno della prima (cache del contesto).
 - [ ] *Importa → Piatto*: scrivi "vitello tonnato per 6" e "Scrivi la ricetta": nel riepilogo controlla dosi, regole e passaggi; la fonte dice che l'ha scritta l'assistente.
+- [ ] Dopo un'importazione, nel riepilogo usa *Rivedi con l'AI*: scrivi "le dosi sono per 6" o "il burro era 120 g". La bozza si aggiorna, nella chat compare l'elenco delle modifiche con "Annulla modifica"; una domanda ("va bene la teglia?") riceve una risposta senza cambiare niente. Nulla viene salvato finché non premi "Salva ricetta".
 - [ ] *Cosa preparo?* → "Chiedi all'AI": propone una tua ricetta con il perché, oppure un piatto nuovo con "Scrivi la ricetta" che apre Importa già compilato.
 - [ ] In una ricetta apri l'assistente e fai una domanda rapida. Ricarica la pagina: la conversazione è ancora lì.
 - [ ] In modalità cucina, "Chiedi" su un passaggio: con "Risposte veloci in cucina" attivo la risposta arriva da Haiku e costa meno di un centesimo.

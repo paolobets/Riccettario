@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { aiRecipeSchema, aiToRecipe, type AiRecipe } from '../schema'
+import { aiReviewSchema } from '../review'
 import { scaleRecipe, renderStepPlain } from '@/core'
 
 const sample: AiRecipe = {
@@ -87,6 +88,13 @@ describe('aiToRecipe', () => {
     const json = JSON.stringify(zodOutputFormat(aiRecipeSchema).schema)
     const unions = (json.match(/"anyOf":/g)?.length ?? 0) + (json.match(/"type":\[/g)?.length ?? 0)
     expect(unions).toBeLessThanOrEqual(16)
+  })
+
+  it('anche lo schema della revisione resta entro il limite', () => {
+    const json = JSON.stringify(zodOutputFormat(aiReviewSchema).schema)
+    const unions = (json.match(/"anyOf":/g)?.length ?? 0) + (json.match(/"type":\[/g)?.length ?? 0)
+    expect(unions).toBeLessThanOrEqual(16)
+    expect(aiReviewSchema.safeParse({ reply: 'ok', updated: [sample] }).success).toBe(true)
   })
 
   it('lo schema zod accetta il campione', () => {

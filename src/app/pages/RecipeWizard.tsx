@@ -17,6 +17,7 @@ import {
   isMassUnit,
   isVolumeUnit,
   dosingOf,
+  formatPan,
   DOSING_MODE_LABELS,
   DOUGH_TYPES,
   type DosingMode,
@@ -33,6 +34,7 @@ import {
 import StepText from '../components/StepText'
 import Icon from '../components/Icon'
 import { useConfirm } from '../components/ConfirmDialog'
+import ImportReviewChat from '../components/ImportReviewChat'
 
 type Phase = 0 | 1 | 2 | 3
 const PHASES = ['Ricetta', 'Ingredienti', 'Passaggi', 'Riepilogo']
@@ -197,7 +199,7 @@ export default function RecipeWizard() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const prefill = (location.state ?? {}) as { recipe?: Recipe; warnings?: string[]; fromAi?: boolean; costUsd?: number; startPhase?: Phase; composed?: boolean }
+  const prefill = (location.state ?? {}) as { recipe?: Recipe; warnings?: string[]; fromAi?: boolean; costUsd?: number; source?: string; startPhase?: Phase; composed?: boolean }
   const [phase, setPhase] = useState<Phase>(prefill.startPhase ?? (prefill.recipe ? 3 : 0))
   const [draft, setDraft] = useState<Draft | null>(id ? null : fromRecipe(prefill.recipe ?? { ...emptyRecipe(), ingredients: [], steps: [] }))
   const [base, setBase] = useState<Pick<Recipe, 'id' | 'createdAt' | 'updatedAt'>>(() => (prefill.recipe ? { id: prefill.recipe.id, createdAt: prefill.recipe.createdAt, updatedAt: prefill.recipe.updatedAt } : emptyRecipe()))
@@ -256,7 +258,7 @@ export default function RecipeWizard() {
       {prefill.fromAi && (
         <div className="notice bg-info-soft text-info">
           <p>
-            L'AI ha strutturato la ricetta. Controlla ingredienti, regole di scalatura e passaggi, poi salva.
+            L'AI ha strutturato la ricetta. Controlla ingredienti, regole di scalatura e passaggi, oppure chiedi all'AI di correggerli qui sotto, poi salva.
             {prefill.costUsd !== undefined && <span className="text-info"> Costo della richiesta: {prefill.costUsd < 0.01 ? '< $0,01' : `$${prefill.costUsd.toFixed(2)}`}.</span>}
           </p>
           {prefill.warnings?.map((w) => (
@@ -290,6 +292,12 @@ export default function RecipeWizard() {
       {phase === 0 && prefill.composed && <p className="text-sm text-muted">Le basi scelte sono già tra gli ingredienti: nella fase Passaggi scrivi il montaggio citandole con i bottoni.</p>}
       {phase === 1 && <PhaseIngredients draft={draft} set={set} recipes={allRecipes ?? []} currentId={base.id} />}
       {phase === 2 && <PhaseSteps draft={draft} set={set} />}
+      {prefill.fromAi && (
+        // Resta montata anche nelle altre fasi, così la conversazione non si perde.
+        <div className={phase === 3 ? '' : 'hidden'}>
+          <ImportReviewChat recipe={toRecipe(draft, base)} source={prefill.source} onReplace={(r) => set(fromRecipe(r))} />
+        </div>
+      )}
       {phase === 3 && <PhaseReview recipe={toRecipe(draft, base)} recipes={allRecipes ?? []} />}
 
       <div className="flex justify-between gap-3 pt-2">
@@ -750,7 +758,8 @@ function PhaseReview({ recipe, recipes }: { recipe: Recipe; recipes: Recipe[] })
       <div>
         <h2 className="text-2xl font-medium text-fg">{recipe.title || 'Senza titolo'}</h2>
         <p className="text-sm text-muted">
-          {recipe.servings} porzioni, {recipe.ingredients.length} ingredienti, {recipe.steps.length} passaggi
+          {recipe.servings} porzioni, {recipe.ingredients.length} ingredienti, {recipe.steps.length} passaggi, dosi a {DOSING_MODE_LABELS[dosingOf(recipe).mode].toLowerCase()}
+          {recipe.pan ? `, teglia ${formatPan(recipe.pan)}` : ''}.
         </p>
       </div>
       <section className="rule pt-3">

@@ -45,7 +45,7 @@ export default function ImportPage() {
       const input = mode === 'text' ? { text } : mode === 'url' ? { url } : mode === 'dish' ? { dish } : { images: files }
       const { importRecipe } = await import('@/ai/import')
       const result = await importRecipe(input, setStatus)
-      navigate('/ricetta/nuova', { state: { recipe: result.recipe, warnings: result.warnings, fromAi: true, costUsd: result.costUsd } })
+      navigate('/ricetta/nuova', { state: { recipe: result.recipe, warnings: result.warnings, fromAi: true, costUsd: result.costUsd, source: result.source } })
     } catch (e) {
       const { describeAiError } = await import('@/ai/client')
       setError(describeAiError(e))
