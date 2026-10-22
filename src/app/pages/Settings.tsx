@@ -281,7 +281,7 @@ export default function Settings() {
       </section>
       <section className="rule space-y-2 pt-4 text-sm text-fg-2">
         <h2 className="section-title text-lg">Guida</h2>
-        <p>Le funzioni principali dell'app in cinque schermate, le stesse della prima apertura.</p>
+        <p>Le funzioni principali dell'app in poche schermate, le stesse della prima apertura.</p>
         <Link to="/?guida" className="btn-secondary">
           <Icon name="book" size={16} /> Rivedi la guida
         </Link>

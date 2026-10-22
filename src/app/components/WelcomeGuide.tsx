@@ -56,6 +56,31 @@ const STEPS: Step[] = [
   },
 ]
 
+/** Telefono o tablet su cui il ricettario non è ancora installato: solo lì ha senso spiegare come farlo. */
+function installStep(): Step | null {
+  if (typeof window === 'undefined') return null
+  const ua = navigator.userAgent
+  const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
+  if (standalone) return null
+  // iPadOS si presenta come Mac: lo si riconosce dal tocco
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+  if (ios) {
+    return {
+      icon: 'share',
+      title: 'Tienilo come app',
+      body: "In Safari tocca Condividi e poi Aggiungi alla schermata Home: il ricettario avrà la sua icona e si aprirà a schermo intero, come un'app.",
+    }
+  }
+  if (/Android/.test(ua)) {
+    return {
+      icon: 'download',
+      title: 'Tienilo come app',
+      body: "In Chrome apri il menu in alto a destra e scegli Installa app: il ricettario avrà la sua icona e si aprirà a schermo intero, come un'app.",
+    }
+  }
+  return null
+}
+
 interface Props {
   /** Ricettario vuoto: all'ultimo passo propone anche le ricette di esempio. */
   empty: boolean
@@ -63,10 +88,14 @@ interface Props {
   onClose: () => void
 }
 
-/** Guida di benvenuto in cinque schermate. Chiuderla in qualsiasi modo la segna come vista. */
+/** Guida di benvenuto in cinque schermate, sei su telefono con quella per installarla. Chiuderla in qualsiasi modo la segna come vista. */
 export default function WelcomeGuide({ empty, onLoadSamples, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   const [i, setI] = useState(0)
+  const [steps] = useState(() => {
+    const install = installStep()
+    return install ? [...STEPS, install] : STEPS
+  })
   useEffect(() => {
     const d = ref.current
     if (d && !d.open) d.showModal()
@@ -77,8 +106,8 @@ export default function WelcomeGuide({ empty, onLoadSamples, onClose }: Props) {
     markSeen()
     onClose()
   }
-  const step = STEPS[i] ?? STEPS[0]!
-  const last = i === STEPS.length - 1
+  const step = steps[i] ?? steps[0]!
+  const last = i === steps.length - 1
   return createPortal(
     <dialog
       ref={ref}
@@ -91,7 +120,7 @@ export default function WelcomeGuide({ empty, onLoadSamples, onClose }: Props) {
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex gap-1" aria-hidden="true">
-          {STEPS.map((s, n) => (
+          {steps.map((s, n) => (
             <span key={s.title} className={`h-1 w-6 rounded-full ${n <= i ? 'bg-accent' : 'bg-surface-3'}`} />
           ))}
         </div>
@@ -101,7 +130,7 @@ export default function WelcomeGuide({ empty, onLoadSamples, onClose }: Props) {
       </div>
       <Icon name={step.icon} size={36} className="mt-4 text-accent-text" />
       <p className="mt-3 text-sm text-muted">
-        {i + 1} di {STEPS.length}
+        {i + 1} di {steps.length}
       </p>
       <h2 id="guida-titolo" className="font-display mt-1 text-2xl font-medium text-fg" aria-live="polite">
         {step.title}
