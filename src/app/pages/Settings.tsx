@@ -19,6 +19,7 @@ export default function Settings() {
   const [theme, setTheme] = useState<Theme>(() => loadTheme())
   const [account, setAccount] = useState<Account | null>(null)
   const sync = useSyncStatus()
+  const installed = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
   useEffect(() => {
     loadAiSettings().then((s) => {
       setAi(s)
@@ -263,6 +264,19 @@ export default function Settings() {
           <p className="text-sm text-fg-2" role="status">
             {message}
           </p>
+        )}
+      </section>
+      <section className="rule space-y-2 pt-4 text-sm text-fg-2">
+        <h2 className="section-title text-lg">Usala come app</h2>
+        {installed ? (
+          <p>Stai già usando il Ricettario come app installata.</p>
+        ) : (
+          <>
+            <p>
+              Su iPhone apri questa pagina in Safari, tocca <Icon name="share" size={14} className="inline align-[-2px]" /> Condividi e poi <b>Aggiungi alla schermata Home</b>: il Ricettario avrà la sua icona e si aprirà a schermo intero, come un'app.
+            </p>
+            <p>Su Android, da Chrome: menu in alto a destra, poi <b>Installa app</b>.</p>
+          </>
         )}
       </section>
       <section className="rule space-y-2 pt-4 text-sm text-fg-2">

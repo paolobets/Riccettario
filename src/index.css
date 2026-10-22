@@ -131,8 +131,19 @@ body {
   color: var(--fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  padding-bottom: env(safe-area-inset-bottom);
+  /* a schermo intero su iPhone la pagina passa sotto la barra di stato e la tacca */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   font-feature-settings: 'tnum' 1, 'cv11' 1;
+}
+
+/* fascia opaca sotto la barra di stato, così il contenuto che scorre non si sovrappone all'ora */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top);
+  background: var(--bg);
+  z-index: 50;
 }
 
 h1,
