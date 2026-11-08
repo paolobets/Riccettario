@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Recipe } from '../model'
-import { collectAllergens, detectAllergens, estimateGrams, labelItems, labelText } from '../label'
+import { collectAllergens, detectAllergens, estimateGrams, labelIngredients, labelItems, labelText } from '../label'
 import { scaleRecipe } from '../scaling'
 
 describe('allergeni dai nomi', () => {
@@ -69,6 +69,24 @@ describe('etichetta', () => {
     expect(items[0]!.allergens).toEqual(['glutine', 'uova', 'latte'])
     expect(collectAllergens(items)).toEqual(['glutine', 'uova', 'latte', 'frutta_a_guscio'])
     expect(labelText(items)).toBe('frolla (FARINA 00, BURRO, zucchero, UOVO), marmellata di albicocche, MANDORLE A LAMELLE, sale')
+  })
+  it('elenco puntato: apre le basi e prende ogni ingrediente una volta sola', () => {
+    const torta: Recipe = {
+      ...crostata,
+      id: 'torta',
+      ingredients: [
+        { id: 'frolla', name: 'frolla', quantity: { amount: 450, unit: 'g' }, recipeId: 'frolla' },
+        { id: 'burro2', name: 'Burro', quantity: { amount: 200, unit: 'g' } },
+        { id: 'sale', name: 'sale', quantity: { amount: 1, unit: 'q.b.' }, scaling: { mode: 'toTaste' } },
+        { id: 'sale2', name: 'sale (fino)', quantity: { amount: 1, unit: 'q.b.' }, scaling: { mode: 'toTaste' } },
+      ],
+    }
+    const flat = labelIngredients(labelItems(torta, 1, (id) => [frolla, torta].find((r) => r.id === id)))
+    // burro: 125 g dalla frolla + 200 g = 325 g, passa davanti alla farina
+    expect(flat.map((i) => i.name)).toEqual(['burro', 'farina 00', 'zucchero', 'uovo', 'sale'])
+    expect(flat[0]!.grams).toBe(325)
+    expect(flat.every((i) => !i.parts)).toBe(true)
+    expect(flat.find((i) => i.name === 'uovo')!.allergens).toEqual(['uova'])
   })
   it('con la base spianata per peso il fattore segue la quantità', () => {
     const items = labelItems(crostata, 2, lookup)

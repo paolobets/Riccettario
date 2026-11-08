@@ -14,7 +14,7 @@ interface Recipe {
   pan?: { shape: 'round'; diameterCm: number } | { shape: 'rect'; widthCm: number; lengthCm: number }  // teglia di riferimento
   dosing?: { mode: 'servings' | 'pans' | 'molds' | 'pieces'; dough?: DoughType; pieceGrams?: number }  // modalità delle dosi
   favorite?: boolean          // stella
-  label?: LabelInfo           // dati dell'etichetta: allergeni confermati, peso netto, durata, conservazione, produttore
+  label?: LabelInfo           // dati dell'etichetta: allergeni confermati, peso netto, durata, conservazione, produttore, note, dicitura facoltativa
   tags: string[]
   sections?: string[]         // es. ["Crema", "Montaggio"]
   ingredients: Ingredient[]
@@ -120,7 +120,7 @@ Un ingrediente con `recipeId` è una **base**: un'altra ricetta che entra in que
 
 ## Etichetta
 
-`labelItems` (`label.ts`) elenca gli ingredienti in ordine decrescente di peso stimato (grammi e millilitri diretti, uova 55 g, cucchiai 12 g…), con le basi tra parentesi e i loro componenti; `detectAllergens` riconosce i 14 allergeni dell'allegato II del regolamento 1169/2011 dalle parole dei nomi (con esclusioni per i falsi amici: noce moscata, latte di cocco, farina di riso). Gli allergeni confermati a mano stanno in `Recipe.label.allergens`; il logo è nelle impostazioni del dispositivo. La stampa usa il formato scelto come dimensione di pagina, oppure un foglio A4 con più copie.
+`labelItems` (`label.ts`) elenca gli ingredienti in ordine decrescente di peso stimato (grammi e millilitri diretti, uova 55 g, cucchiai 12 g…), con le basi tra parentesi e i loro componenti; `labelIngredients` ne fa l'elenco puntato dell'etichetta, con le basi aperte e ogni ingrediente una volta sola (nome normalizzato come nella spesa, grammi sommati per l'ordine); `detectAllergens` riconosce i 14 allergeni dell'allegato II del regolamento 1169/2011 dalle parole dei nomi (con esclusioni per i falsi amici: noce moscata, latte di cocco, farina di riso). Gli allergeni confermati a mano stanno in `Recipe.label.allergens`; il logo è nelle impostazioni del dispositivo. Ogni formato ha il suo corpo del testo e la sua altezza del logo; l'anteprima avvisa quando il contenuto supera l'altezza del formato. La stampa usa il formato scelto come dimensione di pagina, oppure un foglio A4 con più copie.
 
 ## Lista della spesa
 

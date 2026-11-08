@@ -138,6 +138,12 @@ export interface LabelInfo {
   producer?: string
   /** Giorni di durata dalla produzione, per la data di scadenza. */
   shelfLifeDays?: number
+  /** Testo libero in fondo all'etichetta (consigli, modo d'uso, dediche). */
+  notes?: string
+  /** Dicitura facoltativa sulla produzione (es. "Prodotto artigianale, preparato in casa"). */
+  statement?: string
+  /** Se la dicitura va stampata: si può tenere il testo e spegnerla. */
+  showStatement?: boolean
 }
 
 export interface Recipe {

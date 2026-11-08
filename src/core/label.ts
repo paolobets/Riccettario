@@ -8,6 +8,7 @@ import type { Recipe } from './model'
 import { flattenIngredients, isDoseUnit, baseFactor, MAX_BASE_DEPTH, type RecipeLookup } from './compose'
 import { scaleRecipe, type ScaledIngredient } from './scaling'
 import { isMassUnit, isVolumeUnit, toBase } from './units'
+import { normalizeIngredientName } from './shopping'
 
 export type AllergenId = 'glutine' | 'crostacei' | 'uova' | 'pesce' | 'arachidi' | 'soia' | 'latte' | 'frutta_a_guscio' | 'sedano' | 'senape' | 'sesamo' | 'solfiti' | 'lupini' | 'molluschi'
 
@@ -103,6 +104,32 @@ export function labelItems(recipe: Recipe, factor: number, lookup: RecipeLookup,
     items.push({ name: ing.name, grams: estimateGrams(ing), allergens: detectAllergens(ing.name), toTaste })
   }
   return sortByWeight(items)
+}
+
+/**
+ * Ingredienti per l'elenco puntato dell'etichetta: le basi aperte nei loro
+ * componenti e ogni ingrediente una volta sola (stesso nome normalizzato,
+ * come nella spesa), con i grammi sommati per l'ordine di peso.
+ */
+export function labelIngredients(items: LabelItem[]): LabelItem[] {
+  const merged = new Map<string, LabelItem>()
+  const add = (item: LabelItem) => {
+    if (item.parts) {
+      item.parts.forEach(add)
+      return
+    }
+    const key = normalizeIngredientName(item.name)
+    const prev = merged.get(key)
+    if (!prev) {
+      merged.set(key, { name: item.name.replace(/\s*\([^)]*\)/g, '').trim() || item.name, grams: item.grams, allergens: [...item.allergens], toTaste: item.toTaste })
+      return
+    }
+    prev.grams = prev.grams === null ? item.grams : item.grams === null ? prev.grams : prev.grams + item.grams
+    prev.allergens = ALLERGEN_IDS.filter((id) => prev.allergens.includes(id) || item.allergens.includes(id))
+    prev.toTaste = prev.toTaste && item.toTaste
+  }
+  items.forEach(add)
+  return sortByWeight([...merged.values()])
 }
 
 /** Tutti gli allergeni presenti, nell'ordine dell'allegato. */

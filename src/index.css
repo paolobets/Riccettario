@@ -258,6 +258,17 @@ dialog::backdrop {
   }
 }
 
+/* Etichetta: è carta, quindi resta chiara anche col tema scuro. */
+.label-paper {
+  color-scheme: light;
+  --surface: #ffffff;
+  --fg: #1c1c19;
+  --fg-2: #45453f;
+  --muted: #55554e;
+  --line: #d6d3c8;
+  --accent: #4d7c0f;
+}
+
 /* Stampa: solo la ricetta, su sfondo bianco, senza comandi. */
 @media print {
   :root {
