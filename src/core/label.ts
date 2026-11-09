@@ -1,13 +1,11 @@
 /**
  * Etichetta degli ingredienti: elenco in ordine decrescente di peso (come
- * chiede il regolamento UE 1169/2011), basi tra parentesi con i loro
- * componenti, allergeni riconosciuti dai nomi ed evidenziati. È un aiuto a
+ * chiede il regolamento UE 1169/2011), allergeni riconosciuti dai nomi ed evidenziati. È un aiuto a
  * scrivere l'etichetta, non un parere legale: gli allergeni vanno confermati.
  */
 import type { Recipe } from './model'
-import { flattenIngredients, isDoseUnit, baseFactor, MAX_BASE_DEPTH, type RecipeLookup } from './compose'
 import { scaleRecipe, type ScaledIngredient } from './scaling'
-import { isMassUnit, isVolumeUnit, toBase } from './units'
+import { isDoseUnit, isMassUnit, isVolumeUnit, toBase } from './units'
 import { normalizeIngredientName } from './shopping'
 
 export type AllergenId = 'glutine' | 'crostacei' | 'uova' | 'pesce' | 'arachidi' | 'soia' | 'latte' | 'frutta_a_guscio' | 'sedano' | 'senape' | 'sesamo' | 'solfiti' | 'lupini' | 'molluschi'
@@ -69,8 +67,6 @@ export interface LabelItem {
   name: string
   grams: number | null
   allergens: AllergenId[]
-  /** Componenti di una base, già in ordine di peso. */
-  parts?: LabelItem[]
   toTaste: boolean
 }
 
@@ -85,39 +81,29 @@ function sortByWeight(items: LabelItem[]): LabelItem[] {
 }
 
 /**
- * Voci dell'etichetta per una ricetta a un dato fattore. Le basi compaiono con
- * il loro nome e, tra parentesi, i componenti; gli allergeni di una base sono
- * l'unione di quelli dei componenti.
+ * Voci dell'etichetta per una ricetta a un dato fattore. Le Basi sono già
+ * copiate nella ricetta come ingredienti veri: un `recipeId` rimasto da dati
+ * vecchi non si apre, la riga vale come ingrediente semplice.
  */
-export function labelItems(recipe: Recipe, factor: number, lookup: RecipeLookup, depth = 0, visited: Set<string> = new Set([recipe.id])): LabelItem[] {
-  const items: LabelItem[] = []
-  for (const ing of scaleRecipe(recipe, factor).ingredients) {
-    const base = ing.recipeId ? lookup(ing.recipeId) : undefined
-    const bf = base ? baseFactor(ing.scaled, base) : null
-    const toTaste = ing.scaling?.mode === 'toTaste' || !ing.scaled || ing.scaled.unit === 'q.b.'
-    if (base && bf?.factor && !visited.has(base.id) && depth < MAX_BASE_DEPTH) {
-      const parts = labelItems(base, bf.factor, lookup, depth + 1, new Set([...visited, base.id]))
-      const grams = estimateGrams(ing) ?? parts.reduce<number | null>((acc, p) => (acc === null || p.grams === null ? (p.grams ?? acc) : acc + p.grams), null)
-      items.push({ name: ing.name, grams, allergens: ALLERGEN_IDS.filter((id) => parts.some((p) => p.allergens.includes(id))), parts, toTaste: false })
-      continue
-    }
-    items.push({ name: ing.name, grams: estimateGrams(ing), allergens: detectAllergens(ing.name), toTaste })
-  }
-  return sortByWeight(items)
+export function labelItems(recipe: Recipe, factor: number): LabelItem[] {
+  return sortByWeight(
+    scaleRecipe(recipe, factor).ingredients.map((ing) => ({
+      name: ing.name,
+      grams: estimateGrams(ing),
+      allergens: detectAllergens(ing.name),
+      toTaste: ing.scaling?.mode === 'toTaste' || !ing.scaled || ing.scaled.unit === 'q.b.',
+    })),
+  )
 }
 
 /**
- * Ingredienti per l'elenco puntato dell'etichetta: le basi aperte nei loro
- * componenti e ogni ingrediente una volta sola (stesso nome normalizzato,
+ * Ingredienti per l'elenco puntato dell'etichetta: ogni ingrediente una volta
+ * sola anche se compare in più sezioni (stesso nome normalizzato,
  * come nella spesa), con i grammi sommati per l'ordine di peso.
  */
 export function labelIngredients(items: LabelItem[]): LabelItem[] {
   const merged = new Map<string, LabelItem>()
   const add = (item: LabelItem) => {
-    if (item.parts) {
-      item.parts.forEach(add)
-      return
-    }
     const key = normalizeIngredientName(item.name)
     const prev = merged.get(key)
     if (!prev) {
@@ -138,16 +124,12 @@ export function collectAllergens(items: LabelItem[]): AllergenId[] {
   return ALLERGEN_IDS.filter((id) => found.has(id))
 }
 
-/** "farina di GRANO, BURRO, frolla alle noci (farina, NOCI, UOVA), sale" con gli allergeni in maiuscolo. */
+/** "farina di GRANO, BURRO, NOCI, sale" con gli allergeni in maiuscolo. */
 export function labelText(items: LabelItem[], highlight: (name: string) => string = (n) => n.toUpperCase()): string {
-  const one = (i: LabelItem): string => {
-    const name = i.allergens.length > 0 && !i.parts ? highlight(i.name) : i.name
-    return i.parts ? `${name} (${i.parts.map(one).join(', ')})` : name
-  }
-  return items.map(one).join(', ')
+  return items.map((i) => (i.allergens.length > 0 ? highlight(i.name) : i.name)).join(', ')
 }
 
 /** Ingredienti semplici con peso, per il totale e per la percentuale sull'etichetta. */
-export function totalGrams(recipe: Recipe, factor: number, lookup: RecipeLookup): number {
-  return flattenIngredients(recipe, factor, lookup).reduce((acc, i) => acc + (estimateGrams(i) ?? 0), 0)
+export function totalGrams(recipe: Recipe, factor: number): number {
+  return scaleRecipe(recipe, factor).ingredients.reduce((acc, i) => acc + (estimateGrams(i) ?? 0), 0)
 }

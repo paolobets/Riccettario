@@ -16,8 +16,6 @@ export interface IngredientDraft {
   note: string
   section: string
   optional: boolean
-  /** Se è una base: id della ricetta. */
-  recipeId: string
 }
 export interface StepDraft {
   id: string
@@ -33,7 +31,7 @@ export interface StepDraft {
 }
 
 export function emptyIngredient(): IngredientDraft {
-  return { id: newId('i'), name: '', amount: '', unit: 'g', mode: 'linear', percent: '', of: '', note: '', section: '', optional: false, recipeId: '' }
+  return { id: newId('i'), name: '', amount: '', unit: 'g', mode: 'linear', percent: '', of: '', note: '', section: '', optional: false }
 }
 export function emptyStep(): StepDraft {
   return { id: newId('s'), text: '', type: '', durationMin: '', temperatureC: '', timerMinutes: '', timerLabel: '', equipment: '', section: '', parallelWith: '' }
@@ -66,7 +64,6 @@ export function fromRecipe(r: Recipe) {
       note: i.note ?? '',
       section: i.section ?? '',
       optional: i.optional ?? false,
-      recipeId: i.recipeId ?? '',
     })),
     steps: r.steps.map<StepDraft>((s) => ({
       id: s.id,
@@ -123,7 +120,6 @@ export function toRecipe(d: Draft, original: Recipe): Recipe {
         note: i.note.trim() || undefined,
         section: i.section.trim() || undefined,
         optional: i.optional || undefined,
-        recipeId: i.recipeId || undefined,
       }
     })
   const steps: Step[] = d.steps

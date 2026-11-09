@@ -90,7 +90,6 @@ export default function LabelPage() {
   const rawF = Number(params.get('f'))
   const factor = Number.isFinite(rawF) && rawF > 0 ? rawF : 1
   const recipe = useLiveQuery(async () => (id ? ((await db.recipes.get(id)) ?? null) : null), [id])
-  const allRecipes = useLiveQuery(() => db.recipes.toArray(), [])
   const logo = useLiveQuery(async () => ((await db.settings.get(LOGO_KEY))?.value as string | undefined) ?? null, [])
   const [info, setInfo] = useState<LabelInfo | null>(null)
   const [producedOn, setProducedOn] = useState(() => new Date().toISOString().slice(0, 10))
@@ -109,11 +108,7 @@ export default function LabelPage() {
     }
   }, [setup])
 
-  const lookup = useMemo(() => {
-    const byId = new Map((allRecipes ?? []).map((r) => [r.id, r]))
-    return (rid: string) => byId.get(rid)
-  }, [allRecipes])
-  const items = useMemo(() => (recipe ? labelItems(recipe, factor, lookup) : []), [recipe, factor, lookup])
+  const items = useMemo(() => (recipe ? labelItems(recipe, factor) : []), [recipe, factor])
   const detected = useMemo(() => collectAllergens(items), [items])
   const ingredients = useMemo(() => labelIngredients(items), [items])
   const previewRef = useRef<HTMLDivElement>(null)
@@ -132,7 +127,7 @@ export default function LabelPage() {
   if (recipe === null || !info) return <NotFound what="ricetta" />
   const confirmed = new Set<AllergenId>((info.allergens as AllergenId[] | undefined) ?? detected)
   const fmt = FORMATS.find((f) => f.id === setup.format)!
-  const grams = totalGrams(recipe, factor, lookup)
+  const grams = totalGrams(recipe, factor)
   const expiry = info.shelfLifeDays ? new Date(new Date(producedOn).getTime() + info.shelfLifeDays * 86_400_000) : null
   const baseFont = fmt.font
 

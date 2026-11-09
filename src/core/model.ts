@@ -68,8 +68,6 @@ export interface Ingredient {
   /** Sezione di appartenenza (impasto, farcitura, ...). */
   section?: string
   optional?: boolean
-  /** Se presente, l'ingrediente è un'altra ricetta (una base): la quantità dice quanta prepararne. */
-  recipeId?: string
 }
 
 export type StepType = 'prep' | 'cook' | 'rest' | 'wait' | 'serve'

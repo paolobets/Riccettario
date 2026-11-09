@@ -3,11 +3,15 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { saveRecipe } from '@/data/repo'
-import { defaultSplitSelection, formatIngredientLine, newId, renderStepPlain, scaleRecipe, splitRecipe } from '@/core'
+import { defaultSelection, formatIngredientLine, newId, renderStepPlain, saveSelectionAsBase, scaleRecipe } from '@/core'
 import Icon from '../components/Icon'
 import NotFound from './NotFound'
 
-/** "Scomponi": stacca una parte della ricetta (la crema, la frolla) in una ricetta a sé, collegata. */
+/**
+ * "Salva come Base": una scelta di ingredienti e passaggi (la crema, la frolla,
+ * anche sparsi nella ricetta) diventa una Base nuova. Nella ricetta restano,
+ * raccolti in una sezione col nome della Base e segnati come presi da lei.
+ */
 export default function SplitPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -22,10 +26,10 @@ export default function SplitPage() {
 
   useEffect(() => {
     if (!recipe || !section) return
-    const sel = defaultSplitSelection(recipe, section)
+    const sel = defaultSelection(recipe, section)
     setIngredientIds(new Set(sel.ingredientIds))
     setStepIds(new Set(sel.stepIds))
-    setTitle((t) => t || `${section} del ${recipe.title.toLowerCase()}`)
+    setTitle((t) => t || section)
   }, [recipe, section])
 
   if (recipe === undefined) return null
@@ -37,24 +41,23 @@ export default function SplitPage() {
     else next.add(id)
     return next
   }
-  const remaining = recipe.ingredients.length - ingredientIds.size
-  const canSave = ingredientIds.size > 0 && remaining > 0 && title.trim().length > 0
+  const canSave = ingredientIds.size > 0 && title.trim().length > 0
 
   const save = async () => {
     setBusy(true)
-    const { base, parent } = splitRecipe(recipe, { ingredientIds: [...ingredientIds], stepIds: [...stepIds], title, baseId: newId('r') })
-    await saveRecipe(base)
-    await saveRecipe(parent)
-    navigate(`/ricetta/${parent.id}`, { replace: true })
+    const saved = saveSelectionAsBase(recipe, { ingredientIds: [...ingredientIds], stepIds: [...stepIds], title, baseId: newId('r') })
+    await saveRecipe(saved.base)
+    await saveRecipe(saved.recipe)
+    navigate(`/ricetta/${saved.base.id}`, { replace: true })
   }
 
   return (
     <div className="space-y-4">
-      <h1 className="text-3xl font-medium text-fg">Scomponi «{recipe.title}»</h1>
-      <p className="text-sm text-muted">Scegli cosa diventa una ricetta a sé. Nella ricetta resta una riga "1 dose di …" collegata, e i passaggi rimasti la citano per nome. Potrai poi dare alla base una resa in grammi per usarla anche a peso.</p>
+      <h1 className="text-3xl font-medium text-fg">Salva come Base</h1>
+      <p className="text-sm text-muted">Da «{recipe.title}» scegli gli ingredienti e i passaggi che diventano una Base nuova, da copiare poi in altre ricette. Qui restano come sono, raccolti in una sezione col nome della Base.</p>
       {sections.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Parti dalla sezione">
-          <span className="text-sm text-muted">Parti dalla sezione</span>
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Scegli tutta una sezione">
+          <span className="text-sm text-muted">Scegli tutta una sezione</span>
           {sections.map((s) => (
             <button key={s} className={`chip-button ${section === s ? 'bg-accent text-on-accent hover:bg-accent-strong' : ''}`} aria-pressed={section === s} onClick={() => setSection(s)}>
               {s}
@@ -63,18 +66,18 @@ export default function SplitPage() {
         </div>
       )}
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-fg-2">Nome della nuova base</span>
+        <span className="mb-1 block font-medium text-fg-2">Nome della Base</span>
         <input className="w-full" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Crema al mascarpone" />
       </label>
       <section className="space-y-1">
-        <h2 className="section-title text-lg">Ingredienti da staccare</h2>
+        <h2 className="section-title text-lg">Ingredienti della Base</h2>
         <ul className="divide-y divide-line">
           {scaled.ingredients.map((i) => (
             <li key={i.id}>
               <label className="flex min-h-11 cursor-pointer items-center gap-3 py-1.5">
                 <input type="checkbox" className="h-5 w-5 accent-accent" checked={ingredientIds.has(i.id)} onChange={() => setIngredientIds(flip(ingredientIds, i.id))} />
                 <span className="min-w-0 flex-1 text-fg">
-                  {formatIngredientLine(i.name, i.scaled, Boolean(i.recipeId))}
+                  {formatIngredientLine(i.name, i.scaled)}
                   {i.section && <span className="text-xs text-muted"> ({i.section})</span>}
                 </span>
               </label>
@@ -83,7 +86,7 @@ export default function SplitPage() {
         </ul>
       </section>
       <section className="space-y-1">
-        <h2 className="section-title text-lg">Passaggi che vanno con la base</h2>
+        <h2 className="section-title text-lg">Passaggi della Base</h2>
         <ul className="divide-y divide-line">
           {recipe.steps.map((s, idx) => (
             <li key={s.id}>
@@ -97,14 +100,9 @@ export default function SplitPage() {
           ))}
         </ul>
       </section>
-      {remaining === 0 && ingredientIds.size > 0 && (
-        <p className="notice flex items-start gap-2 bg-warning-soft text-warning">
-          <Icon name="alert" size={16} className="mt-0.5" /> <span>Lascia almeno un ingrediente nella ricetta madre, altrimenti non c'è nulla da scomporre.</span>
-        </p>
-      )}
       <div className="flex flex-wrap gap-2">
         <button className="btn-primary" disabled={!canSave || busy} onClick={save}>
-          <Icon name="book" size={16} /> Crea la base e aggiorna la ricetta
+          <Icon name="book" size={16} /> {busy ? 'Salvo…' : 'Salva come Base'}
         </button>
         <Link to={`/ricetta/${recipe.id}`} className="btn-secondary">
           Annulla

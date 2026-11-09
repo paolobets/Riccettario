@@ -4,11 +4,11 @@
  * da quale Base e da quale versione viene (`Recipe.baseCopies`), così si può
  * capire se la Base è cambiata o se la copia è stata modificata.
  */
-import type { BaseCopy, Ingredient, Quantity, Recipe, Step } from './model'
+import type { BaseCopy, Ingredient, Quantity, Recipe, Step, Unit } from './model'
 import { slugify } from './model'
 import { scaleRecipe } from './scaling'
-import { baseFactor } from './compose'
 import { estimateGrams } from './label'
+import { isDoseUnit, isMassUnit, isVolumeUnit, toBase } from './units'
 
 export const BASE_TAG = 'base'
 
@@ -19,6 +19,32 @@ export function isBase(r: Recipe): boolean {
 export function setBase(r: Recipe, on: boolean): Recipe {
   const tags = r.tags.filter((t) => t !== BASE_TAG)
   return { ...r, tags: on ? [...tags, BASE_TAG] : tags }
+}
+
+export interface BaseFactor {
+  /** Fattore con cui preparare la Base; `null` se non si può ricavare. */
+  factor: number | null
+  problem?: string
+}
+
+/**
+ * Quanto preparare della Base per una quantità: a dosi è il numero stesso, a
+ * peso o volume è il rapporto con la resa della Base.
+ */
+export function baseFactor(q: Quantity | undefined, base: Recipe): BaseFactor {
+  if (!q || !(q.amount > 0)) return { factor: null, problem: 'Senza quantità non so quanta Base preparare.' }
+  const b = toBase(q)
+  if (isDoseUnit(b.unit)) return { factor: b.amount }
+  const y = base.yield ? toBase({ amount: base.yield.amount, unit: base.yield.unit as Unit }) : null
+  if (isMassUnit(b.unit)) {
+    if (!y || !isMassUnit(y.unit) || !(y.amount > 0)) return { factor: null, problem: `«${base.title}» non ha una resa in grammi: indicala nella Base, oppure misura questa quantità a dosi.` }
+    return { factor: b.amount / y.amount }
+  }
+  if (isVolumeUnit(b.unit)) {
+    if (!y || !isVolumeUnit(y.unit) || !(y.amount > 0)) return { factor: null, problem: `«${base.title}» non ha una resa in millilitri: indicala nella Base, oppure misura questa quantità a dosi.` }
+    return { factor: b.amount / y.amount }
+  }
+  return { factor: null, problem: 'Una Base si misura in grammi, millilitri o dosi.' }
 }
 
 // --- Impronte ----------------------------------------------------------------
@@ -156,7 +182,7 @@ export function copiedParts(base: Recipe, factor: number, prefix: string, sectio
   const sec = (inner: string | undefined) => (inner ? `${section}: ${inner}` : section)
   const scaled = scaleRecipe(base, factor)
   const ingredients = scaled.ingredients.map<Ingredient>((s) => {
-    const { original: _o, exact, scaled: _s, adjusted: _a, warning: _w, recipeId: _r, ...ing } = s
+    const { original: _o, exact, scaled: _s, adjusted: _a, warning: _w, ...ing } = s
     return {
       ...ing,
       id: pid(ing.id),
@@ -350,7 +376,7 @@ export function saveSelectionAsBase(recipe: Recipe, opts: SaveAsBaseOptions, now
     servings: recipe.servings,
     yield: grams > 0 ? { amount: Math.round(grams), unit: 'g' } : undefined,
     tags: [BASE_TAG],
-    ingredients: recipe.ingredients.filter((i) => ingSet.has(i.id)).map(({ section: _s, recipeId: _r, ...i }) => i),
+    ingredients: recipe.ingredients.filter((i) => ingSet.has(i.id)).map(({ section: _s, ...i }) => i),
     steps: recipe.steps.filter((s) => stepSet.has(s.id)).map(({ section: _s, ...s }) => ({ ...s, parallelWith: s.parallelWith && stepSet.has(s.parallelWith) ? s.parallelWith : undefined })),
     createdAt: now,
     updatedAt: now,

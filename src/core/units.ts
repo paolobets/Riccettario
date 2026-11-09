@@ -71,3 +71,13 @@ export function roundingDelta(exact: Quantity, rounded: Quantity): number {
   if (e === 0) return 0
   return (r - e) / e
 }
+
+/** Senza unità o "pz" la quantità di una Base conta le dosi, non i grammi. */
+export function isDoseUnit(unit: Unit): boolean {
+  return unit === '' || unit === 'pz'
+}
+
+export function formatDoses(n: number): string {
+  const v = Math.round(n * 100) / 100
+  return `${v.toLocaleString('it-IT')} ${v === 1 ? 'dose' : 'dosi'}`
+}
