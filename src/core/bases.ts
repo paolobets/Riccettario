@@ -222,3 +222,75 @@ export function copyBaseInto(recipe: Recipe, base: Recipe, quantity: Quantity, o
   copy.copied = sectionFingerprint(withCopy, section)
   return { ok: true, recipe: withCopy }
 }
+
+// --- Stato, usi, aggiornamento -------------------------------------------------
+
+/**
+ * Stato di una copia rispetto alla sua Base:
+ * `current` uguale all'ultima versione, `outdated` la Base è cambiata,
+ * `modified` modificata nella ricetta (vale anche se la Base è cambiata),
+ * `orphan` la Base non esiste più.
+ */
+export type CopyStatus = 'current' | 'outdated' | 'modified' | 'orphan'
+
+export function copyStatus(recipe: Recipe, copy: BaseCopy, base: Recipe | undefined): CopyStatus {
+  if (!base) return 'orphan'
+  if (sectionFingerprint(recipe, copy.section) !== copy.copied) return 'modified'
+  return baseFingerprint(base) === copy.baseVersion ? 'current' : 'outdated'
+}
+
+export interface BaseUsage {
+  recipe: Recipe
+  copy: BaseCopy
+  status: CopyStatus
+}
+
+/** Le ricette che hanno copiato direttamente questa Base, una voce per copia, in ordine di titolo. */
+export function baseUsages(recipes: Recipe[], base: Recipe): BaseUsage[] {
+  const out: BaseUsage[] = []
+  for (const r of recipes) {
+    if (r.id === base.id) continue
+    for (const c of r.baseCopies ?? []) if (c.baseId === base.id) out.push({ recipe: r, copy: c, status: copyStatus(r, c, base) })
+  }
+  return out.sort((a, b) => a.recipe.title.localeCompare(b.recipe.title, 'it') || a.copy.section.localeCompare(b.copy.section, 'it'))
+}
+
+/**
+ * Sostituisce la sezione copiata con la versione attuale della Base, alla
+ * stessa quantità chiesta (il fattore si ricalcola sulla resa nuova) e con lo
+ * stesso prefisso, così i riferimenti esterni restano validi. Un riferimento
+ * esterno a un ingrediente che non c'è più diventa il suo nome.
+ */
+export function updateBaseCopy(recipe: Recipe, section: string, base: Recipe): CopyResult {
+  const copy = recipe.baseCopies?.find((c) => c.section === section)
+  if (!copy) return { ok: false, problem: `Nella ricetta non c'è la sezione «${section}» presa da una Base.` }
+  const { factor } = baseFactor(copy.quantity, base)
+  if (factor === null) return { ok: false, problem: 'La resa della Base è cambiata: scegli di nuovo la quantità.' }
+
+  const parts = copiedParts(base, factor, copy.prefix, section)
+  const oldIngredients = recipe.ingredients.filter((i) => inSection(i.section, section))
+  const ingAt = recipe.ingredients.findIndex((i) => inSection(i.section, section))
+  const stepAt = recipe.steps.findIndex((s) => inSection(s.section, section))
+
+  const ingredients = recipe.ingredients.filter((i) => !inSection(i.section, section))
+  ingredients.splice(ingAt >= 0 ? ingAt : ingredients.length, 0, ...parts.ingredients)
+
+  const newIds = new Set(parts.ingredients.map((i) => i.id))
+  const gone = new Map(oldIngredients.filter((i) => !newIds.has(i.id)).map((i) => [i.id, i.name]))
+  const steps = recipe.steps
+    .filter((s) => !inSection(s.section, section))
+    .map((s) => ({ ...s, text: s.text.replace(REF, (m, ref: string) => gone.get(ref) ?? m) }))
+  steps.splice(stepAt >= 0 ? stepAt : stepInsertIndex(recipe), 0, ...parts.steps)
+
+  const next = withSections({ ...recipe, ingredients, steps })
+  const updated: BaseCopy = { ...copy, baseVersion: baseFingerprint(base), copied: '' }
+  const withCopy: Recipe = { ...next, baseCopies: (recipe.baseCopies ?? []).map((c) => (c === copy ? updated : c)) }
+  updated.copied = sectionFingerprint(withCopy, section)
+  return { ok: true, recipe: withCopy }
+}
+
+/** Dimentica l'origine delle copie di una Base (cancellata): ingredienti e passaggi restano. */
+export function forgetBase(recipe: Recipe, baseId: string): Recipe {
+  const baseCopies = (recipe.baseCopies ?? []).filter((c) => c.baseId !== baseId)
+  return { ...recipe, baseCopies: baseCopies.length ? baseCopies : undefined }
+}

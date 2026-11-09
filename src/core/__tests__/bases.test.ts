@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Recipe } from '../model'
-import { baseFingerprint, copyBaseInto, isBase, sectionFingerprint, setBase, wouldCycle } from '../bases'
+import { baseFingerprint, baseUsages, copyBaseInto, copyStatus, forgetBase, isBase, sectionFingerprint, setBase, updateBaseCopy, wouldCycle } from '../bases'
 
 const now = '2026-01-01T00:00:00.000Z'
 const pasticcera: Recipe = {
@@ -155,5 +155,85 @@ describe('Basi', () => {
     expect(wouldCycle([A, B], 'B', 'A')).toBe(true)
     expect(wouldCycle([A, B], 'X', 'A')).toBe(false)
     expect(wouldCycle([A, B], 'A', 'A')).toBe(true)
+  })
+})
+
+describe('aggiornare le copie', () => {
+  const piuZucchero: Recipe = { ...pasticcera, ingredients: pasticcera.ingredients.map((i) => (i.id === 'zucchero' ? { ...i, quantity: { amount: 160, unit: 'g' as const } } : i)) }
+  const copy = (r: Recipe, section = 'Pasticcera') => r.baseCopies!.find((c) => c.section === section)!
+
+  it('stati', () => {
+    const r = copied()
+    expect(copyStatus(r, copy(r), pasticcera)).toBe('current')
+    expect(copyStatus(r, copy(r), piuZucchero)).toBe('outdated')
+    const mod: Recipe = { ...r, ingredients: r.ingredients.map((i) => (i.id === 'pasticcera-zucchero' ? { ...i, quantity: { amount: 90, unit: 'g' as const } } : i)) }
+    expect(copyStatus(mod, copy(mod), pasticcera)).toBe('modified')
+    expect(copyStatus(mod, copy(mod), piuZucchero)).toBe('modified')
+    expect(copyStatus(r, copy(r), undefined)).toBe('orphan')
+  })
+
+  it('aggiorna tenendo la quantità', () => {
+    const r = copied()
+    const doppia: Recipe = { ...pasticcera, yield: { amount: 1200, unit: 'g' }, ingredients: pasticcera.ingredients.map((i) => ({ ...i, quantity: { ...i.quantity!, amount: i.quantity!.amount * 2 } })) }
+    const res = updateBaseCopy(r, 'Pasticcera', doppia)
+    if (!res.ok) throw new Error(res.problem)
+    expect(res.recipe.ingredients.find((i) => i.id === 'pasticcera-latte')?.quantity).toEqual({ amount: 250, unit: 'g' })
+    expect(res.recipe.ingredients.map((i) => i.id)).toEqual(r.ingredients.map((i) => i.id))
+    expect(res.recipe.steps.map((s) => s.id)).toEqual(r.steps.map((s) => s.id))
+    expect(copyStatus(res.recipe, copy(res.recipe), doppia)).toBe('current')
+  })
+
+  it('aggiorna i valori cambiati nella Base', () => {
+    const r = copied()
+    const res = updateBaseCopy(r, 'Pasticcera', piuZucchero)
+    if (!res.ok) throw new Error(res.problem)
+    expect(res.recipe.ingredients.find((i) => i.id === 'pasticcera-zucchero')?.quantity).toEqual({ amount: 80, unit: 'g' })
+  })
+
+  it('non aggiorna se la resa non va più bene', () => {
+    const res = updateBaseCopy(copied(), 'Pasticcera', { ...pasticcera, yield: undefined })
+    expect(res).toEqual({ ok: false, problem: 'La resa della Base è cambiata: scegli di nuovo la quantità.' })
+  })
+
+  it('riferimento esterno a un ingrediente tolto', () => {
+    const r = copied()
+    const conRif: Recipe = { ...r, steps: [...r.steps, { id: 'f2', text: 'Spennella con {pasticcera-tuorli}' }] }
+    const senzaTuorli: Recipe = { ...pasticcera, ingredients: pasticcera.ingredients.filter((i) => i.id !== 'tuorli'), steps: [{ id: 's1', text: 'Scalda {latte} con {zucchero}.' }] }
+    const res = updateBaseCopy(conRif, 'Pasticcera', senzaTuorli)
+    if (!res.ok) throw new Error(res.problem)
+    expect(res.recipe.steps.find((s) => s.id === 'f2')?.text).toBe('Spennella con tuorli')
+    expect(res.recipe.steps.map((s) => s.id)).toEqual(['pasticcera-s1', 'f1', 'f2'])
+  })
+
+  it('aggiorna solo la copia scelta', () => {
+    const two = copyBaseInto(copied(), pasticcera, { amount: 600, unit: 'g' })
+    if (!two.ok) throw new Error(two.problem)
+    const res = updateBaseCopy(two.recipe, 'Pasticcera (2)', piuZucchero)
+    if (!res.ok) throw new Error(res.problem)
+    expect(res.recipe.ingredients.find((i) => i.id === 'pasticcera-2-zucchero')?.quantity).toEqual({ amount: 160, unit: 'g' })
+    expect(res.recipe.ingredients.find((i) => i.id === 'pasticcera-zucchero')?.quantity).toEqual({ amount: 75, unit: 'g' })
+    expect(copyStatus(res.recipe, copy(res.recipe, 'Pasticcera'), piuZucchero)).toBe('outdated')
+  })
+
+  it('usi diretti', () => {
+    const r = copied()
+    const torta: Recipe = { ...crostata, id: 'torta', title: 'Torta semplice' }
+    const pronta = copyBaseInto({ ...crostata, id: 'pronta', title: 'Crostata pronta', tags: ['base'], ingredients: [], steps: [] }, pasticcera, { amount: 1, unit: '' })
+    if (!pronta.ok) throw new Error(pronta.problem)
+    const usaPronta = copyBaseInto({ ...crostata, id: 'usa', title: 'Aaa usa la pronta' }, pronta.recipe, { amount: 1, unit: '' })
+    if (!usaPronta.ok) throw new Error(usaPronta.problem)
+    const usi = baseUsages([r, torta, pronta.recipe, usaPronta.recipe, pasticcera], pasticcera)
+    expect(usi.map((u) => [u.recipe.title, u.status])).toEqual([
+      ['Crostata', 'current'],
+      ['Crostata pronta', 'current'],
+    ])
+  })
+
+  it("forgetBase toglie l'origine e lascia ingredienti e passaggi", () => {
+    const r = copied()
+    const f = forgetBase(r, 'pasticcera')
+    expect(f.baseCopies).toBeUndefined()
+    expect(f.ingredients).toEqual(r.ingredients)
+    expect(f.steps).toEqual(r.steps)
   })
 })
