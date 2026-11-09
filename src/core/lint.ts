@@ -6,12 +6,11 @@ import type { Recipe } from './model'
 import { formatDuration } from './format'
 import { ingredientIdsInStep } from './steps'
 import { isCountUnit } from './units'
-import { baseFactor, type RecipeLookup } from './compose'
 
 const LONG_STEP_MINUTES = 10
 const LONG_REST_MINUTES = 20
 
-export function checkRecipe(recipe: Recipe, lookup?: RecipeLookup): string[] {
+export function checkRecipe(recipe: Recipe): string[] {
   const out: string[] = []
   if (!recipe.title.trim()) out.push('Manca il titolo.')
   if (!(recipe.servings > 0)) out.push('Le porzioni devono essere almeno 1.')
@@ -26,18 +25,6 @@ export function checkRecipe(recipe: Recipe, lookup?: RecipeLookup): string[] {
       out.push(`«${i.name}» scala a pezzi interi: con la regola lineare potresti ritrovarti 2,6 uova. Imposta "a pezzi interi".`)
   }
 
-  if (lookup) {
-    for (const i of recipe.ingredients) {
-      if (!i.recipeId) continue
-      const base = lookup(i.recipeId)
-      if (!base) out.push(`«${i.name}» rimanda a una ricetta che non c'è più.`)
-      else {
-        const { problem } = baseFactor(i.quantity, base)
-        if (problem) out.push(`Base «${i.name}»: ${problem}`)
-      }
-    }
-  }
-
   const cited = new Set(recipe.steps.flatMap((s) => ingredientIdsInStep(s)))
   const unused = recipe.ingredients.filter((i) => i.name.trim() && !cited.has(i.id))
   if (unused.length > 0 && recipe.steps.length > 0) out.push(`Ingredienti mai citati nei passaggi: ${unused.map((i) => i.name).join(', ')}.`)
@@ -46,6 +33,7 @@ export function checkRecipe(recipe: Recipe, lookup?: RecipeLookup): string[] {
   recipe.steps.forEach((s, idx) => {
     const n = idx + 1
     if (!s.text.trim()) out.push(`Il passo ${n} è vuoto.`)
+    if (ingredientIdsInStep(s).some((id) => !ids.has(id))) out.push(`Il passo ${n} cita un ingrediente che non c'è più: correggi il testo.`)
     if (s.parallelWith && (!stepIds.has(s.parallelWith) || s.parallelWith === s.id)) out.push(`Il passo ${n} è segnato come parallelo a un passaggio che non esiste.`)
     const minutes = s.durationMin ?? 0
     const timed = s.type === 'cook' || s.type === 'rest' || s.type === 'wait'

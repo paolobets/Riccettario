@@ -55,11 +55,10 @@ export function formatQuantity(q: Quantity): string {
 }
 
 /** "500 g di farina", "2 uova", "sale q.b."; per una base a dosi "1 dose di frolla". */
-export function formatIngredientLine(name: string, q: Quantity | undefined, asBase = false): string {
+export function formatIngredientLine(name: string, q: Quantity | undefined): string {
   if (!q) return name
   if (q.unit === 'q.b.') return `${name} q.b.`
   const d = toDisplayUnit(q)
-  if (asBase && (d.unit === '' || d.unit === 'pz')) return `${formatAmount(d.amount, '')} ${d.amount === 1 ? 'dose' : 'dosi'} di ${name}`
   if (d.unit === '' || d.unit === 'pz') return `${formatAmount(d.amount, d.unit)} ${name}`
   return `${formatQuantity(d)} di ${name}`
 }

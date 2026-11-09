@@ -206,6 +206,10 @@ describe('controllo della ricetta', () => {
     expect(w).toContain('Il passo 2 è segnato come parallelo a un passaggio che non esiste.')
     expect(w).toContain('«acqua»: percentuale del panettiere senza ingrediente base.')
   })
+  it('segnala un passaggio che cita un ingrediente che non esiste', () => {
+    const r: Recipe = { ...pane, ingredients: [{ id: 'acqua', name: 'acqua', quantity: { amount: 300, unit: 'ml' } }], steps: [{ id: 's1', text: 'Versa {acqua} su {crema-tuorli}.' }] }
+    expect(checkRecipe(r)).toContain("Il passo 1 cita un ingrediente che non c'è più: correggi il testo.")
+  })
 })
 
 describe('condivisione', () => {

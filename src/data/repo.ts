@@ -1,7 +1,7 @@
 import { db, type Chat, type CookSession, type ShoppingList } from './db'
 import { sampleRecipes } from './samples'
 import type { Recipe } from '@/core'
-import { detachBase, newId, usedAsBaseIn } from '@/core'
+import { forgetBase, newId } from '@/core'
 import { scheduleSync } from './sync'
 
 const SEEDED_KEY = 'seeded'
@@ -37,9 +37,9 @@ export async function deleteRecipe(id: string): Promise<void> {
   await db.transaction('rw', db.recipes, db.sessions, db.chats, db.tombstones, async () => {
     const sessionIds = await db.sessions.where('recipeId').equals(id).primaryKeys()
     const chatIds = await db.chats.where('recipeId').equals(id).primaryKeys()
-    // Le ricette che la usavano come base la tengono come ingrediente semplice.
-    const parents = usedAsBaseIn(await db.recipes.toArray(), id)
-    if (parents.length) await db.recipes.bulkPut(parents.map((p) => ({ ...detachBase(p, id), updatedAt: deletedAt })))
+    // Le ricette che avevano copiato questa Base tengono ingredienti e passaggi, perdono solo l'origine.
+    const users = (await db.recipes.toArray()).filter((r) => r.baseCopies?.some((c) => c.baseId === id))
+    if (users.length) await db.recipes.bulkPut(users.map((r) => ({ ...forgetBase(r, id), updatedAt: deletedAt })))
     await db.recipes.delete(id)
     await db.sessions.bulkDelete(sessionIds)
     await db.chats.bulkDelete(chatIds)
