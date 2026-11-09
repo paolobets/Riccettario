@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { saveRecipe } from '@/data/repo'
 import {
+  copyBaseInto,
   newId,
   SCALING_MODE_LABELS,
   slugify,
@@ -18,6 +20,7 @@ import {
   DOUGH_TYPES,
   type DosingMode,
   type DoughType,
+  type Quantity,
   type Recipe,
   type ScalingMode,
   type StepType,
@@ -27,6 +30,7 @@ import StepText from '../components/StepText'
 import Icon from '../components/Icon'
 import { useConfirm } from '../components/ConfirmDialog'
 import ImportReviewChat from '../components/ImportReviewChat'
+import BasePicker from '../components/BasePicker'
 import { emptyIngredient, emptyStep, fromRecipe, num, toRecipe, type Draft, type IngredientDraft, type StepDraft } from '../wizard/draft'
 
 type Phase = 0 | 1 | 2 | 3
@@ -44,6 +48,7 @@ export default function RecipeWizard() {
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(Boolean(prefill.recipe))
   const { confirm, dialog } = useConfirm()
+  const allRecipes = useLiveQuery(() => db.recipes.toArray(), [])
 
   useEffect(() => {
     if (!id) return
@@ -127,7 +132,7 @@ export default function RecipeWizard() {
 
       {phase === 0 && <PhaseInfo draft={draft} set={set} isNew={!id && !prefill.recipe} />}
       {phase === 0 && prefill.composed && <p className="text-sm text-muted">Ingredienti e passaggi delle Basi scelte sono già nella ricetta: nella fase Passaggi aggiungi il montaggio.</p>}
-      {phase === 1 && <PhaseIngredients draft={draft} set={set} />}
+      {phase === 1 && <PhaseIngredients draft={draft} set={set} original={original} recipes={allRecipes ?? []} />}
       {phase === 2 && <PhaseSteps draft={draft} set={set} />}
       {prefill.fromAi && (
         // Resta montata anche nelle altre fasi, così la conversazione non si perde.
@@ -265,7 +270,32 @@ function PhaseInfo({ draft, set, isNew }: { draft: Draft; set: (p: Partial<Draft
   )
 }
 
-function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => void }) {
+/** Quale dialogo delle Basi è aperto: per aggiungerne una o per sostituire una riga. */
+type BaseDialog = { replace?: IngredientDraft } | null
+
+/** Quantità di una riga della bozza, se ne ha una. */
+function draftQuantity(i: IngredientDraft): Quantity | undefined {
+  const amount = num(i.amount)
+  return amount !== undefined && i.mode !== 'toTaste' ? { amount, unit: i.unit } : undefined
+}
+
+function PhaseIngredients({ draft, set, original, recipes }: { draft: Draft; set: (p: Partial<Draft>) => void; original: Recipe; recipes: Recipe[] }) {
+  const [baseDialog, setBaseDialog] = useState<BaseDialog>(null)
+  const [baseProblem, setBaseProblem] = useState<string | null>(null)
+  const copyBase = (base: Recipe, quantity: Quantity) => {
+    const res = copyBaseInto(toRecipe(draft, original), base, quantity, { replaceIngredientId: baseDialog?.replace?.id })
+    if (!res.ok) {
+      setBaseProblem(res.problem)
+      setBaseDialog(null)
+      return
+    }
+    setBaseProblem(null)
+    setBaseDialog(null)
+    const next = fromRecipe(res.recipe)
+    set({ ingredients: next.ingredients, steps: next.steps, baseCopies: next.baseCopies })
+  }
+  const copyOf = (section: string) => draft.baseCopies.find((c) => c.section === section)
+  const baseTitle = (baseId: string) => recipes.find((r) => r.id === baseId)?.title
   const update = (idx: number, patch: Partial<IngredientDraft>) => {
     const next = draft.ingredients.map((i, k) => (k === idx ? { ...i, ...patch } : i))
     set({ ingredients: next })
@@ -288,6 +318,11 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
       </p>
       {draft.ingredients.map((ing, idx) => (
         <div key={ing.id} className="card space-y-2">
+          {ing.section && ing.section !== draft.ingredients[idx - 1]?.section && copyOf(ing.section) && (
+            <p className="inline-flex items-center gap-1 text-xs text-muted">
+              <Icon name="book" size={14} /> {ing.section}: dalla Base «{baseTitle(copyOf(ing.section)!.baseId) ?? 'cancellata'}»
+            </p>
+          )}
           <div className="flex items-center gap-1">
             <input
               className="min-w-0 flex-1"
@@ -304,6 +339,15 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
             />
             <button className="btn-ghost h-10 w-9 shrink-0 p-0" onClick={() => move(idx, -1)} disabled={idx === 0} aria-label={`Sposta su ${ing.name || 'ingrediente'}`}><Icon name="up" size={16} /></button>
             <button className="btn-ghost h-10 w-9 shrink-0 p-0" onClick={() => move(idx, 1)} disabled={idx === draft.ingredients.length - 1} aria-label={`Sposta giù ${ing.name || 'ingrediente'}`}><Icon name="down" size={16} /></button>
+            <button
+              className="btn-ghost h-10 w-9 shrink-0 p-0"
+              onClick={() => setBaseDialog({ replace: ing })}
+              disabled={!ing.name.trim()}
+              aria-label={`Sostituisci ${ing.name || 'ingrediente'} con una Base`}
+              title="Sostituisci con una Base"
+            >
+              <Icon name="book" size={16} />
+            </button>
             <button className="btn-ghost h-10 w-9 shrink-0 p-0 text-danger" onClick={() => remove(idx)} aria-label={`Rimuovi ${ing.name || 'ingrediente'}`}><Icon name="close" size={16} /></button>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -374,7 +418,28 @@ function PhaseIngredients({ draft, set }: { draft: Draft; set: (p: Partial<Draft
         <button className="btn-secondary w-full" onClick={add}>
           <Icon name="plus" size={16} /> Aggiungi ingrediente
         </button>
+        <button className="btn-secondary w-full" onClick={() => setBaseDialog({})}>
+          <Icon name="book" size={16} /> Aggiungi una Base
+        </button>
       </div>
+      {baseDialog && (
+        <BasePicker
+          recipes={recipes}
+          currentId={original.id}
+          initial={baseDialog.replace ? draftQuantity(baseDialog.replace) : undefined}
+          title={baseDialog.replace ? `Sostituisci «${baseDialog.replace.name}» con una Base` : 'Aggiungi una Base'}
+          onPick={copyBase}
+          onClose={() => {
+            setBaseDialog(null)
+            setBaseProblem(null)
+          }}
+        />
+      )}
+      {baseProblem && (
+        <p className="notice flex items-start gap-2 bg-warning-soft text-warning" role="alert">
+          <Icon name="alert" size={16} className="mt-0.5" /> <span>{baseProblem}</span>
+        </p>
+      )}
     </section>
   )
 }
