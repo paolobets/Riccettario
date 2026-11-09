@@ -110,20 +110,32 @@ export function baseFingerprint(base: Recipe): string {
   )
 }
 
-/** Vero se `s` è la sezione o una sua sottosezione ("Pasticcera: Crema"). */
-export function inSection(s: string | undefined, section: string): boolean {
-  return s === section || (s?.startsWith(`${section}: `) ?? false)
+/** Le sezioni che appartengono a una copia: la sua e le sottosezioni che ha creato. */
+export function copySections(copy: Pick<BaseCopy, 'section' | 'inner'>): string[] {
+  return [copy.section, ...(copy.inner ?? [])]
+}
+
+/**
+ * Filtro per gli elementi di una sezione: per una sezione copiata comprende le
+ * sottosezioni registrate nella copia, mai altre sezioni che per caso iniziano
+ * con lo stesso nome ("Pasticcera: decoro" scritta a mano).
+ */
+export function sectionMatcher(recipe: Recipe, section: string): (s: string | undefined) => boolean {
+  const copy = recipe.baseCopies?.find((c) => c.section === section)
+  const names = new Set(copy ? copySections(copy) : [section])
+  return (s) => s !== undefined && names.has(s)
 }
 
 /** Impronta di una sezione copiata, per capire se è stata modificata nella ricetta. */
 export function sectionFingerprint(recipe: Recipe, section: string): string {
   const prefix = recipe.baseCopies?.find((c) => c.section === section)?.prefix ?? ''
+  const inside = sectionMatcher(recipe, section)
   const id = (x: string) => (prefix && x.startsWith(`${prefix}-`) ? x.slice(prefix.length + 1) : x)
   const sec = (x: string | undefined) => (x === section ? undefined : x?.slice(section.length + 2))
   return hash(
     stable({
-      ingredients: recipe.ingredients.filter((i) => inSection(i.section, section)).map((i) => normIngredient(i, id, sec)),
-      steps: recipe.steps.filter((s) => inSection(s.section, section)).map((s) => normStep(s, id, sec)),
+      ingredients: recipe.ingredients.filter((i) => inside(i.section)).map((i) => normIngredient(i, id, sec)),
+      steps: recipe.steps.filter((s) => inside(s.section)).map((s) => normStep(s, id, sec)),
     }),
   )
 }
@@ -162,7 +174,7 @@ function sectionsOf(r: Pick<Recipe, 'ingredients' | 'steps'>): string[] {
 }
 
 function uniqueSection(recipe: Recipe, title: string): string {
-  const taken = new Set([...sectionsOf(recipe), ...(recipe.baseCopies ?? []).map((c) => c.section)])
+  const taken = new Set([...sectionsOf(recipe), ...(recipe.baseCopies ?? []).flatMap(copySections)])
   if (!taken.has(title)) return title
   for (let n = 2; ; n++) if (!taken.has(`${title} (${n})`)) return `${title} (${n})`
 }
@@ -177,7 +189,7 @@ function uniquePrefix(recipe: Recipe, base: Recipe): string {
 }
 
 /** Ingredienti e passaggi della Base, scalati con `factor`, con id prefissati e sezione `section`. */
-export function copiedParts(base: Recipe, factor: number, prefix: string, section: string): { ingredients: Ingredient[]; steps: Step[] } {
+export function copiedParts(base: Recipe, factor: number, prefix: string, section: string): { ingredients: Ingredient[]; steps: Step[]; inner: string[] } {
   const pid = (id: string) => (prefix ? `${prefix}-${id}` : id)
   const sec = (inner: string | undefined) => (inner ? `${section}: ${inner}` : section)
   const scaled = scaleRecipe(base, factor)
@@ -198,7 +210,8 @@ export function copiedParts(base: Recipe, factor: number, prefix: string, sectio
     parallelWith: s.parallelWith ? pid(s.parallelWith) : undefined,
     section: sec(s.section),
   }))
-  return { ingredients, steps }
+  const inner = [...new Set([...ingredients, ...steps].map((x) => x.section).filter((x): x is string => Boolean(x) && x !== section))]
+  return { ingredients, steps, inner }
 }
 
 /** Dove vanno i passaggi di una copia nuova: dopo quelli delle copie già presenti, altrimenti in testa. */
@@ -206,7 +219,7 @@ function stepInsertIndex(recipe: Recipe): number {
   const copies = recipe.baseCopies ?? []
   let last = -1
   recipe.steps.forEach((s, i) => {
-    if (copies.some((c) => inSection(s.section, c.section))) last = i
+    if (copies.some((c) => s.section !== undefined && copySections(c).includes(s.section))) last = i
   })
   return last + 1
 }
@@ -244,7 +257,7 @@ export function copyBaseInto(recipe: Recipe, base: Recipe, quantity: Quantity, o
   steps.splice(stepInsertIndex(recipe), 0, ...parts.steps)
 
   const next = withSections({ ...recipe, ingredients, steps })
-  const copy: BaseCopy = { section, baseId: base.id, baseVersion: baseFingerprint(base), quantity, prefix, copied: '' }
+  const copy: BaseCopy = { section, baseId: base.id, baseVersion: baseFingerprint(base), quantity, prefix, copied: '', ...(parts.inner.length ? { inner: parts.inner } : {}) }
   const withCopy: Recipe = { ...next, baseCopies: [...(recipe.baseCopies ?? []), copy] }
   copy.copied = sectionFingerprint(withCopy, section)
   return { ok: true, recipe: withCopy }
@@ -295,22 +308,24 @@ export function updateBaseCopy(recipe: Recipe, section: string, base: Recipe): C
   if (factor === null) return { ok: false, problem: 'La resa della Base è cambiata: scegli di nuovo la quantità.' }
 
   const parts = copiedParts(base, factor, copy.prefix, section)
-  const oldIngredients = recipe.ingredients.filter((i) => inSection(i.section, section))
-  const ingAt = recipe.ingredients.findIndex((i) => inSection(i.section, section))
-  const stepAt = recipe.steps.findIndex((s) => inSection(s.section, section))
+  const inside = sectionMatcher(recipe, section)
+  const oldIngredients = recipe.ingredients.filter((i) => inside(i.section))
+  const ingAt = recipe.ingredients.findIndex((i) => inside(i.section))
+  const stepAt = recipe.steps.findIndex((s) => inside(s.section))
 
-  const ingredients = recipe.ingredients.filter((i) => !inSection(i.section, section))
+  const ingredients = recipe.ingredients.filter((i) => !inside(i.section))
   ingredients.splice(ingAt >= 0 ? ingAt : ingredients.length, 0, ...parts.ingredients)
 
   const newIds = new Set(parts.ingredients.map((i) => i.id))
   const gone = new Map(oldIngredients.filter((i) => !newIds.has(i.id)).map((i) => [i.id, i.name]))
   const steps = recipe.steps
-    .filter((s) => !inSection(s.section, section))
+    .filter((s) => !inside(s.section))
     .map((s) => ({ ...s, text: s.text.replace(REF, (m, ref: string) => gone.get(ref) ?? m) }))
   steps.splice(stepAt >= 0 ? stepAt : stepInsertIndex(recipe), 0, ...parts.steps)
 
   const next = withSections({ ...recipe, ingredients, steps })
-  const updated: BaseCopy = { ...copy, baseVersion: baseFingerprint(base), copied: '' }
+  const { inner: _old, ...rest } = copy
+  const updated: BaseCopy = { ...rest, baseVersion: baseFingerprint(base), copied: '', ...(parts.inner.length ? { inner: parts.inner } : {}) }
   const withCopy: Recipe = { ...next, baseCopies: (recipe.baseCopies ?? []).map((c) => (c === copy ? updated : c)) }
   updated.copied = sectionFingerprint(withCopy, section)
   return { ok: true, recipe: withCopy }
@@ -334,11 +349,12 @@ export interface SaveAsBaseOptions {
 
 /** Selezione proposta per una sezione: i suoi ingredienti e i passaggi della sezione o che citano solo quelli. */
 export function defaultSelection(recipe: Recipe, section: string): { ingredientIds: string[]; stepIds: string[] } {
-  const ingredientIds = recipe.ingredients.filter((i) => inSection(i.section, section)).map((i) => i.id)
+  const inside = sectionMatcher(recipe, section)
+  const ingredientIds = recipe.ingredients.filter((i) => inside(i.section)).map((i) => i.id)
   const set = new Set(ingredientIds)
   const stepIds = recipe.steps
     .filter((s) => {
-      if (inSection(s.section, section)) return true
+      if (inside(s.section)) return true
       const cited = [...s.text.matchAll(REF)].map((m) => m[1]!)
       return cited.length > 0 && cited.every((id) => set.has(id))
     })
@@ -367,6 +383,7 @@ export function saveSelectionAsBase(recipe: Recipe, opts: SaveAsBaseOptions, now
   const stepSet = new Set(opts.stepIds)
   const title = opts.title.trim() || 'Base'
   const baseId = opts.baseId ?? `r-${Math.random().toString(36).slice(2, 10)}`
+  const names = new Map(recipe.ingredients.map((i) => [i.id, i.name]))
   const grams = scaleRecipe(recipe, 1)
     .ingredients.filter((i) => ingSet.has(i.id))
     .reduce((sum, i) => sum + (estimateGrams(i) ?? 0), 0)
@@ -376,8 +393,18 @@ export function saveSelectionAsBase(recipe: Recipe, opts: SaveAsBaseOptions, now
     servings: recipe.servings,
     yield: grams > 0 ? { amount: Math.round(grams), unit: 'g' } : undefined,
     tags: [BASE_TAG],
-    ingredients: recipe.ingredients.filter((i) => ingSet.has(i.id)).map(({ section: _s, ...i }) => i),
-    steps: recipe.steps.filter((s) => stepSet.has(s.id)).map(({ section: _s, ...s }) => ({ ...s, parallelWith: s.parallelWith && stepSet.has(s.parallelWith) ? s.parallelWith : undefined })),
+    // Nella Base nulla deve puntare fuori dalla scelta: i riferimenti a ingredienti non scelti diventano il loro nome,
+    // una percentuale del panettiere su un ingrediente non scelto torna lineare.
+    ingredients: recipe.ingredients
+      .filter((i) => ingSet.has(i.id))
+      .map(({ section: _s, ...i }) => (i.scaling?.mode === 'bakersPercent' && !ingSet.has(i.scaling.of) ? { ...i, scaling: undefined } : i)),
+    steps: recipe.steps
+      .filter((s) => stepSet.has(s.id))
+      .map(({ section: _s, ...s }) => ({
+        ...s,
+        text: s.text.replace(REF, (m, ref: string) => (ingSet.has(ref) ? m : (names.get(ref) ?? m))),
+        parallelWith: s.parallelWith && stepSet.has(s.parallelWith) ? s.parallelWith : undefined,
+      })),
     createdAt: now,
     updatedAt: now,
   }
@@ -385,7 +412,14 @@ export function saveSelectionAsBase(recipe: Recipe, opts: SaveAsBaseOptions, now
   // Il nome della sezione si sceglie senza contare gli elementi che ci finiscono dentro.
   const others: Recipe = { ...recipe, ingredients: recipe.ingredients.filter((i) => !ingSet.has(i.id)), steps: recipe.steps.filter((s) => !stepSet.has(s.id)) }
   const othersSections = sectionsOf(others)
-  const section = uniqueSection({ ...others, baseCopies: (recipe.baseCopies ?? []).filter((c) => othersSections.some((x) => inSection(x, c.section))) }, title)
+  // Le copie tengono solo le sezioni che conservano qualcosa: una sottosezione svuotata non occupa più il nome.
+  const trim = (c: BaseCopy, present: string[]): BaseCopy => {
+    const inner = (c.inner ?? []).filter((x) => present.includes(x))
+    const { inner: _i, ...rest } = c
+    return inner.length ? { ...rest, inner } : rest
+  }
+  const othersCopies = (recipe.baseCopies ?? []).map((c) => trim(c, othersSections)).filter((c) => copySections(c).some((x) => othersSections.includes(x)))
+  const section = uniqueSection({ ...others, baseCopies: othersCopies }, title)
 
   const moved = withSections({
     ...recipe,
@@ -393,7 +427,10 @@ export function saveSelectionAsBase(recipe: Recipe, opts: SaveAsBaseOptions, now
     steps: gather(recipe.steps, stepSet, (s) => ({ ...s, section })),
   })
   const left = moved.sections ?? []
-  const kept = (recipe.baseCopies ?? []).filter((c) => c.section !== section && left.some((x) => inSection(x, c.section)))
+  const kept = (recipe.baseCopies ?? [])
+    .filter((c) => c.section !== section)
+    .map((c) => trim(c, left.filter((x) => x !== section)))
+    .filter((c) => copySections(c).some((x) => left.includes(x) && x !== section))
   const copy: BaseCopy = { section, baseId, baseVersion: baseFingerprint(base), quantity: { amount: 1, unit: '' }, prefix: '', copied: '' }
   const out: Recipe = { ...moved, baseCopies: [...kept, copy], updatedAt: now }
   copy.copied = sectionFingerprint(out, section)

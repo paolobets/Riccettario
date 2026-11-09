@@ -116,6 +116,35 @@ describe('copiare una Base', () => {
   })
 })
 
+describe('sezioni con i due punti nel nome', () => {
+  const piuZucchero: Recipe = { ...pasticcera, ingredients: pasticcera.ingredients.map((i) => (i.id === 'zucchero' ? { ...i, quantity: { amount: 160, unit: 'g' as const } } : i)) }
+
+  it("aggiornare una copia non tocca una sezione dell'utente che inizia col suo nome", () => {
+    const conDecoro: Recipe = { ...crostata, ingredients: [...crostata.ingredients, { id: 'granella', name: 'granella', quantity: { amount: 20, unit: 'g' }, section: 'Pasticcera: decoro' }] }
+    const r = copied(conDecoro)
+    const copy = r.baseCopies![0]!
+    expect(copyStatus(r, copy, pasticcera)).toBe('current')
+    const res = updateBaseCopy(r, 'Pasticcera', piuZucchero)
+    if (!res.ok) throw new Error(res.problem)
+    expect(res.recipe.ingredients.find((i) => i.id === 'granella')?.section).toBe('Pasticcera: decoro')
+  })
+
+  it('due Basi «Crema» e «Crema: light» restano distinte', () => {
+    const crema: Recipe = { ...pasticcera, id: 'crema-b', title: 'Crema' }
+    const light: Recipe = { ...pasticcera, id: 'light', title: 'Crema: light' }
+    const one = copyBaseInto(crostata, crema, { amount: 1, unit: '' })
+    if (!one.ok) throw new Error(one.problem)
+    const two = copyBaseInto(one.recipe, light, { amount: 1, unit: '' })
+    if (!two.ok) throw new Error(two.problem)
+    const c = two.recipe.baseCopies!.find((x) => x.baseId === 'crema-b')!
+    expect(copyStatus(two.recipe, c, crema)).toBe('current')
+    const res = updateBaseCopy(two.recipe, c.section, { ...crema, ingredients: crema.ingredients.slice(0, 1) })
+    if (!res.ok) throw new Error(res.problem)
+    const l = res.recipe.baseCopies!.find((x) => x.baseId === 'light')!
+    expect(copyStatus(res.recipe, l, light)).toBe('current')
+  })
+})
+
 describe('impronte', () => {
   it('ignora stringhe e liste vuote', () => {
     const r = copied()
@@ -277,6 +306,14 @@ describe('salva come Base', () => {
     expect(recipe.steps.find((s) => s.id === 'p5')?.parallelWith).toBe('p4')
     expect(recipe.baseCopies).toEqual([expect.objectContaining({ section: 'Crema', baseId: 'crema', prefix: '', quantity: { amount: 1, unit: '' } })])
     expect(copyStatus(recipe, recipe.baseCopies![0]!, base)).toBe('current')
+  })
+
+  it('nella Base i riferimenti a ingredienti non scelti diventano nomi', () => {
+    const conPercent: Recipe = { ...mista, ingredients: mista.ingredients.map((i) => (i.id === 'c' ? { ...i, scaling: { mode: 'bakersPercent' as const, percent: 25, of: 'a' } } : i)) }
+    const { base } = saveSelectionAsBase(conPercent, { ingredientIds: ['latte', 'c'], stepIds: ['p1', 'p2'], title: 'Crema', baseId: 'crema' }, now)
+    expect(base.steps.find((s) => s.id === 'p1')?.text).toBe('Impasta farina e burro')
+    expect(base.steps.find((s) => s.id === 'p2')?.text).toBe('Scalda {latte}')
+    expect(base.ingredients.find((i) => i.id === 'c')?.scaling).toBeUndefined()
   })
 
   it("una sezione intera salvata col suo nome non diventa «(2)»", () => {

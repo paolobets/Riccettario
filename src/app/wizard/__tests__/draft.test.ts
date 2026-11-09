@@ -65,10 +65,12 @@ describe('bozza del wizard', () => {
       ],
       steps: [{ id: 's1', text: 'Scalda {latte}', equipment: ['pentolino'], timer: { minutes: 5 } }],
     }
-    const res = copyBaseInto({ ...recipe(), ingredients: [], steps: [] }, base, { amount: 300, unit: 'g' })
+    // Come nel wizard: l'originale è la ricetta di prima della copia.
+    const before: Recipe = { ...recipe(), ingredients: [], steps: [] }
+    const res = copyBaseInto(before, base, { amount: 300, unit: 'g' })
     if (!res.ok) throw new Error(res.problem)
     const r = res.recipe
-    const again = toRecipe(fromRecipe(r), r)
+    const again = toRecipe(fromRecipe(r), before)
     expect(sectionFingerprint(again, 'Crema')).toBe(sectionFingerprint(r, 'Crema'))
     expect(again.ingredients.find((i) => i.id === 'crema-tuorli')?.scaling).toEqual({ mode: 'discrete', step: 2, rounding: 'ceil' })
   })

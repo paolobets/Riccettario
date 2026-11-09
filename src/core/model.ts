@@ -157,6 +157,8 @@ export interface BaseCopy {
   prefix: string
   /** Impronta della sezione appena copiata (sectionFingerprint), per capire se è stata modificata. */
   copied: string
+  /** Sottosezioni create dalla copia ("Crostata pronta: Crema"), quando la Base aveva sezioni sue. */
+  inner?: string[]
 }
 
 export interface Recipe {

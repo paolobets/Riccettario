@@ -2,7 +2,7 @@
  * Bozza del wizard: la ricetta con le quantità come stringhe per l'editing,
  * e le conversioni da e verso `Recipe`.
  */
-import { dosingOf, newId, type DosingMode, type DoughType, type Ingredient, type Pan, type Recipe, type ScalingMode, type ScalingRule, type Step, type StepType, type Unit } from '@/core'
+import { copySections, dosingOf, newId, type DosingMode, type DoughType, type Ingredient, type Pan, type Recipe, type ScalingMode, type ScalingRule, type Step, type StepType, type Unit } from '@/core'
 
 /** Stato del form: come Recipe ma con quantità come stringhe per l'editing. */
 export interface IngredientDraft {
@@ -16,6 +16,8 @@ export interface IngredientDraft {
   note: string
   section: string
   optional: boolean
+  /** Regola di scalatura completa di partenza: passo, arrotondamento ed esponente non hanno un campo nella bozza. */
+  rule?: ScalingRule
 }
 export interface StepDraft {
   id: string
@@ -64,6 +66,7 @@ export function fromRecipe(r: Recipe) {
       note: i.note ?? '',
       section: i.section ?? '',
       optional: i.optional ?? false,
+      rule: i.scaling,
     })),
     steps: r.steps.map<StepDraft>((s) => ({
       id: s.id,
@@ -92,7 +95,6 @@ export function num(s: string): number | undefined {
  * wizard non gestisce (etichetta, preferito, ...) restano com'erano.
  */
 export function toRecipe(d: Draft, original: Recipe): Recipe {
-  const originalById = new Map(original.ingredients.map((i) => [i.id, i]))
   const ingredients: Ingredient[] = d.ingredients
     .filter((i) => i.name.trim())
     .map((i) => {
@@ -107,7 +109,7 @@ export function toRecipe(d: Draft, original: Recipe): Recipe {
           break
         default: {
           // La bozza non mostra passo, arrotondamento ed esponente: se la regola non cambia si tiene quella originale.
-          const prev = originalById.get(i.id)?.scaling
+          const prev = i.rule
           scaling = prev?.mode === i.mode ? prev : ({ mode: i.mode } as ScalingRule)
         }
       }
@@ -141,7 +143,7 @@ export function toRecipe(d: Draft, original: Recipe): Recipe {
     })
   const sections = [...new Set([...ingredients, ...steps].map((x) => x.section).filter((x): x is string => Boolean(x)))]
   // L'origine di una sezione copiata vale finché la sezione (o una sua sottosezione) esiste ancora.
-  const baseCopies = d.baseCopies.filter((c) => sections.some((x) => x === c.section || x.startsWith(`${c.section}: `)))
+  const baseCopies = d.baseCopies.filter((c) => copySections(c).some((x) => sections.includes(x)))
   const yieldAmount = num(d.yieldAmount)
   const panA = num(d.panA)
   const panB = num(d.panB)
