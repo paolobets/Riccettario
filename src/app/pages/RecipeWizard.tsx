@@ -4,7 +4,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { saveRecipe } from '@/data/repo'
 import {
+  baseFingerprint,
+  baseUsages,
   copyBaseInto,
+  isBase,
   newId,
   SCALING_MODE_LABELS,
   slugify,
@@ -85,7 +88,10 @@ export default function RecipeWizard() {
     setSaving(true)
     const recipe = toRecipe(draft, original)
     await saveRecipe(recipe)
-    navigate(`/ricetta/${recipe.id}`)
+    // Una Base corretta e già copiata altrove: si va a scegliere quali ricette aggiornare.
+    const changed = isBase(recipe) && baseFingerprint(recipe) !== baseFingerprint(original)
+    const used = changed && baseUsages(allRecipes ?? [], recipe).length > 0
+    navigate(`/ricetta/${recipe.id}${used ? '?aggiorna=1' : ''}`)
   }
 
   return (

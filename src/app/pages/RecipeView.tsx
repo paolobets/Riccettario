@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/data/db'
 import { addToShoppingList, deleteRecipe, duplicateRecipe, saveRecipe, toggleFavorite } from '@/data/repo'
-import { activeDuration, baseUsages, encodeRecipeForLink, formatDuration, formatPan, recipeToText, STEP_TYPE_LABELS, totalDuration } from '@/core'
+import { activeDuration, baseUsages, encodeRecipeForLink, isBase, setBase, formatDuration, formatPan, recipeToText, STEP_TYPE_LABELS, totalDuration } from '@/core'
 import { clearCookState, loadCookState, type CookState } from '../cook/state'
 import { useScaler } from '../hooks/useScaler'
 import ScalerPanel from '../components/ScalerPanel'
@@ -11,6 +11,7 @@ import IngredientList from '../components/IngredientList'
 import StepText from '../components/StepText'
 import TimerButton from '../components/TimerButton'
 import AiPanel from '../components/AiPanel'
+import BaseUsagePanel, { BaseCopiesPanel } from '../components/BaseUsagePanel'
 import Icon from '../components/Icon'
 import { useConfirm } from '../components/ConfirmDialog'
 import NotFound from './NotFound'
@@ -41,6 +42,16 @@ export default function RecipeView() {
   const [notesDraft, setNotesDraft] = useState<string | null>(null)
   const [cook, setCook] = useState<CookState | null>(() => (id ? loadCookState(id) : null))
   const [message, setMessage] = useState<string | null>(null)
+  // `?aggiorna=1` arriva dal wizard dopo aver corretto una Base usata altrove: apre la scelta delle ricette da aggiornare, una volta.
+  const [params, setParams] = useSearchParams()
+  const [autoOpenUpdate] = useState(() => params.get('aggiorna') === '1')
+  useEffect(() => {
+    if (params.has('aggiorna')) {
+      const next = new URLSearchParams(params)
+      next.delete('aggiorna')
+      setParams(next, { replace: true })
+    }
+  }, [params, setParams])
 
   if (recipe === undefined) return null
   if (recipe === null || !scaler.scaled) return <NotFound what="ricetta" />
@@ -188,6 +199,14 @@ export default function RecipeView() {
         <Link to={`/ricetta/${recipe.id}/etichetta${scaler.search ? `?${scaler.search}` : ''}`} className="btn-secondary min-h-10 px-3 py-1.5 text-sm">
           <Icon name="tag" size={16} /> Etichetta
         </Link>
+        <button
+          className={`min-h-10 px-3 py-1.5 text-sm ${isBase(recipe) ? 'btn-primary' : 'btn-secondary'}`}
+          aria-pressed={isBase(recipe)}
+          title="Una Base si può copiare dentro altre ricette"
+          onClick={() => saveRecipe(setBase(recipe, !isBase(recipe)))}
+        >
+          <Icon name="book" size={16} /> È una Base
+        </button>
       </div>
       {message && (
         <p className="text-sm text-fg-2 print:hidden" role="status">
@@ -229,7 +248,10 @@ export default function RecipeView() {
           </div>
         </div>
         <IngredientList scaled={scaled} onPivot={scaler.setPivot} />
+        <BaseCopiesPanel recipe={recipe} recipes={allRecipes ?? []} />
       </section>
+
+      {isBase(recipe) && <BaseUsagePanel base={recipe} recipes={allRecipes ?? []} autoOpenUpdate={autoOpenUpdate} />}
 
       <section className="rule pt-4">
         <h2 className="section-title mb-3">Preparazione</h2>
