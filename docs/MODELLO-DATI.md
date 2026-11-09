@@ -37,9 +37,19 @@ interface Ingredient {
   scaling?: ScalingRule       // default: linear
   section?: string
   optional?: boolean
-  recipeId?: string           // se presente l'ingrediente è un'altra ricetta (una base)
+}
+
+interface BaseCopy {          // Recipe.baseCopies: sezioni copiate da una Base
+  section: string             // "Pasticcera", "Pasticcera (2)"
+  baseId: string
+  baseVersion: string         // impronta della Base al momento della copia
+  quantity: Quantity          // quantità chiesta: 300 g, oppure 2 dosi (unità vuota)
+  prefix: string              // prefisso degli id copiati ('' per Salva come Base)
+  copied: string              // impronta della sezione appena copiata
 }
 ```
+
+Un `recipeId` negli ingredienti è un resto del vecchio collegamento alle basi: se arriva da dati vecchi (sincronizzazione, backup) si ignora e la riga vale come ingrediente semplice.
 
 Unità: `g kg ml l cucchiaio cucchiaino tazza bicchiere pizzico pz bustina foglia spicchio rametto fetta q.b.` e la stringa vuota per i conteggi ("2 uova"). Internamente kg e l vengono portati in g e ml; in visualizzazione si torna a kg/l sopra i 1000.
 
@@ -109,18 +119,21 @@ I timer avviati (da lettura o da modalità cucina) vivono in un unico store pers
 
 `renderStep` in `steps.ts` sostituisce i riferimenti con la quantità già scalata ("350 g di acqua"), così lettura e modalità cucina mostrano sempre i numeri giusti.
 
-## Ricette composte
+## Basi
 
-Un ingrediente con `recipeId` è una **base**: un'altra ricetta che entra in questa. La quantità dice quanta prepararne, in due modi (`compose.ts`):
+Una **Base** (pasticcera, frolla, pralinato, frangipane) è una ricetta normale con il tag `base` (`isBase`, `setBase`). Usarla in un'altra ricetta è una **copia**, non un collegamento (`bases.ts`):
 
-- **a peso o volume** ("300 g di frolla"): il fattore della base è quantità / resa della base, quindi serve `yield` in grammi o millilitri;
-- **a dosi** (senza unità, "1 dose di crema"): il fattore è il numero di dosi.
-
-`resolveBases` dà le basi dirette con il loro fattore (o il motivo per cui non si ricava); `flattenIngredients` apre le basi fino a tre livelli, senza cicli, e dà agli ingredienti interni la base come sezione: lo usano la spesa e l'etichetta. `wouldCycle` impedisce di scegliere come base una ricetta che contiene già la madre. Cancellando una base, le ricette che la usavano la tengono come ingrediente semplice (`detachBase`). `splitRecipe` fa l'operazione inversa ("scomponi"): stacca ingredienti e passaggi in una nuova ricetta e lascia nella madre una riga "1 dose di …" collegata, riscrivendo i riferimenti nei passaggi rimasti. L'assistente riceve le basi insieme alla ricetta.
+- `copyBaseInto(ricetta, base, quantità, { replaceIngredientId? })` copia ingredienti e passaggi della Base, scalati, come sezione col titolo della Base ("Pasticcera", oppure "Pasticcera (2)" se c'è già; le sezioni interne della Base diventano "Crostata pronta: Crema"). La quantità si dà **a peso o volume** (fattore = quantità / resa della Base, serve `yield` in g o ml) oppure **a dosi** (senza unità: il fattore è il numero di dosi), come calcola `baseFactor`. Gli id copiati prendono il prefisso dello slug della Base (`pasticcera-latte`), riscritti anche nei passaggi, nelle percentuali del panettiere e nei paralleli. Gli ingredienti vanno al posto della riga sostituita (o in coda), i passaggi prima di quelli della ricetta, dopo quelli delle Basi già copiate. Con `replaceIngredientId` la riga sparisce e nei passaggi i riferimenti a lei diventano il suo nome.
+- La copia è una sezione come le altre: si modifica liberamente, la Base non cambia. Etichetta, spesa, cucina e assistente la trattano come ingredienti normali.
+- L'origine sta in `Recipe.baseCopies`. `baseFingerprint` (ingredienti, passaggi e resa della Base) e `sectionFingerprint` (la sezione nella ricetta, con il prefisso tolto) sono hash FNV-1a del JSON normalizzato: stringhe e liste vuote contano come assenti, così un'andata e ritorno nel wizard non fa risultare modificata una copia. `copyStatus` dà `current`, `outdated` (la Base è cambiata), `modified` (la copia è stata modificata nella ricetta; vale più di `outdated`) o `orphan` (la Base non c'è più).
+- `baseUsages(ricette, base)` elenca gli usi **diretti** di una Base, una voce per copia: una Base copiata dentro un'altra Base si aggiorna un livello alla volta. `updateBaseCopy` sostituisce la sezione con la versione attuale della Base alla **stessa quantità** chiesta (il fattore si ricalcola sulla resa nuova; se la resa non va più bene non aggiorna e lo dice) e con lo stesso prefisso, così i riferimenti esterni restano validi; un riferimento esterno a un ingrediente che non c'è più diventa il suo nome, e `checkRecipe` segnala i riferimenti rotti. `wouldCycle` impedisce di copiare una Base che contiene già, copiata, la ricetta di destinazione.
+- `saveSelectionAsBase` ("Salva come Base", prima "Scomponi"): ingredienti e passaggi scelti a mano diventano una Base nuova con gli stessi id, senza sezione; nella ricetta restano, raccolti in una sezione col nome della Base alla posizione del primo scelto, e la sezione risulta copiata da lei (`prefix` vuoto). `defaultSelection` propone una sezione intera.
+- Cancellando una Base, le ricette che l'avevano copiata tengono tutto e perdono solo l'origine (`forgetBase`).
+- Salvando dal wizard una Base modificata e già copiata altrove, l'app apre la pagina della Base con `?aggiorna=1` e propone le ricette da aggiornare: spuntate quelle uguali alla copia, non spuntate quelle modificate (con l'avviso che le modifiche si perdono).
 
 ## Etichetta
 
-`labelItems` (`label.ts`) elenca gli ingredienti in ordine decrescente di peso stimato (grammi e millilitri diretti, uova 55 g, cucchiai 12 g…), con le basi tra parentesi e i loro componenti; `labelIngredients` ne fa l'elenco puntato dell'etichetta, con le basi aperte e ogni ingrediente una volta sola (nome normalizzato come nella spesa, grammi sommati per l'ordine); `detectAllergens` riconosce i 14 allergeni dell'allegato II del regolamento 1169/2011 dalle parole dei nomi (con esclusioni per i falsi amici: noce moscata, latte di cocco, farina di riso). Gli allergeni confermati a mano stanno in `Recipe.label.allergens`; il logo è nelle impostazioni del dispositivo. Ogni formato ha il suo corpo del testo e la sua altezza del logo; l'anteprima avvisa quando il contenuto supera l'altezza del formato. La stampa usa il formato scelto come dimensione di pagina, oppure un foglio A4 con più copie.
+`labelItems` (`label.ts`) elenca gli ingredienti in ordine decrescente di peso stimato (grammi e millilitri diretti, uova 55 g, cucchiai 12 g…), Basi copiate comprese; `labelIngredients` ne fa l'elenco puntato dell'etichetta, con ogni ingrediente una volta sola anche se sta in più sezioni (nome normalizzato come nella spesa, grammi sommati per l'ordine); `detectAllergens` riconosce i 14 allergeni dell'allegato II del regolamento 1169/2011 dalle parole dei nomi (con esclusioni per i falsi amici: noce moscata, latte di cocco, farina di riso). Gli allergeni confermati a mano stanno in `Recipe.label.allergens`; il logo è nelle impostazioni del dispositivo. Ogni formato ha il suo corpo del testo e la sua altezza del logo; l'anteprima avvisa quando il contenuto supera l'altezza del formato. La stampa usa il formato scelto come dimensione di pagina, oppure un foglio A4 con più copie.
 
 ## Lista della spesa
 
@@ -132,7 +145,7 @@ Un ingrediente con `recipeId` è una **base**: un'altra ricetta che entra in que
 
 ## Controllo della ricetta
 
-`checkRecipe` (`lint.ts`) produce consigli non bloccanti mostrati nel riepilogo del wizard: titolo o porzioni mancanti, ingredienti mai citati, uova con regola lineare, passaggi di cottura o riposo da 10 minuti in su senza timer, riposi da 20 minuti in su senza nulla in parallelo, passaggi vuoti o paralleli a un passaggio inesistente, percentuale del panettiere senza base.
+`checkRecipe` (`lint.ts`) produce consigli non bloccanti mostrati nel riepilogo del wizard: titolo o porzioni mancanti, ingredienti mai citati, uova con regola lineare, passaggi di cottura o riposo da 10 minuti in su senza timer, riposi da 20 minuti in su senza nulla in parallelo, passaggi vuoti o paralleli a un passaggio inesistente, passaggi che citano un ingrediente che non c'è più, percentuale del panettiere senza base.
 
 ## Condivisione
 
