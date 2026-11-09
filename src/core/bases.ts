@@ -8,6 +8,7 @@ import type { BaseCopy, Ingredient, Quantity, Recipe, Step } from './model'
 import { slugify } from './model'
 import { scaleRecipe } from './scaling'
 import { baseFactor } from './compose'
+import { estimateGrams } from './label'
 
 export const BASE_TAG = 'base'
 
@@ -293,4 +294,82 @@ export function updateBaseCopy(recipe: Recipe, section: string, base: Recipe): C
 export function forgetBase(recipe: Recipe, baseId: string): Recipe {
   const baseCopies = (recipe.baseCopies ?? []).filter((c) => c.baseId !== baseId)
   return { ...recipe, baseCopies: baseCopies.length ? baseCopies : undefined }
+}
+
+// --- Salva come Base -----------------------------------------------------------
+
+export interface SaveAsBaseOptions {
+  ingredientIds: string[]
+  stepIds: string[]
+  title: string
+  /** Id della Base nuova; se assente ne viene generato uno. */
+  baseId?: string
+}
+
+/** Selezione proposta per una sezione: i suoi ingredienti e i passaggi della sezione o che citano solo quelli. */
+export function defaultSelection(recipe: Recipe, section: string): { ingredientIds: string[]; stepIds: string[] } {
+  const ingredientIds = recipe.ingredients.filter((i) => inSection(i.section, section)).map((i) => i.id)
+  const set = new Set(ingredientIds)
+  const stepIds = recipe.steps
+    .filter((s) => {
+      if (inSection(s.section, section)) return true
+      const cited = [...s.text.matchAll(REF)].map((m) => m[1]!)
+      return cited.length > 0 && cited.every((id) => set.has(id))
+    })
+    .map((s) => s.id)
+  return { ingredientIds, stepIds }
+}
+
+/** Raggruppa gli elementi scelti alla posizione del primo, nell'ordine in cui erano. */
+function gather<T extends { id: string }>(items: T[], chosen: Set<string>, move: (x: T) => T): T[] {
+  const first = items.findIndex((x) => chosen.has(x.id))
+  if (first < 0) return items
+  const picked = items.filter((x) => chosen.has(x.id)).map(move)
+  const rest = items.filter((x) => !chosen.has(x.id))
+  const at = items.slice(0, first).filter((x) => !chosen.has(x.id)).length
+  rest.splice(at, 0, ...picked)
+  return rest
+}
+
+/**
+ * Fa una Base nuova con gli ingredienti e i passaggi scelti (stessi id, senza
+ * sezione). Nella ricetta gli elementi restano, raccolti nella sezione col
+ * titolo della Base, e la sezione risulta copiata da questa Base.
+ */
+export function saveSelectionAsBase(recipe: Recipe, opts: SaveAsBaseOptions, now = new Date().toISOString()): { base: Recipe; recipe: Recipe } {
+  const ingSet = new Set(opts.ingredientIds)
+  const stepSet = new Set(opts.stepIds)
+  const title = opts.title.trim() || 'Base'
+  const baseId = opts.baseId ?? `r-${Math.random().toString(36).slice(2, 10)}`
+  const grams = scaleRecipe(recipe, 1)
+    .ingredients.filter((i) => ingSet.has(i.id))
+    .reduce((sum, i) => sum + (estimateGrams(i) ?? 0), 0)
+  const base: Recipe = {
+    id: baseId,
+    title,
+    servings: recipe.servings,
+    yield: grams > 0 ? { amount: Math.round(grams), unit: 'g' } : undefined,
+    tags: [BASE_TAG],
+    ingredients: recipe.ingredients.filter((i) => ingSet.has(i.id)).map(({ section: _s, recipeId: _r, ...i }) => i),
+    steps: recipe.steps.filter((s) => stepSet.has(s.id)).map(({ section: _s, ...s }) => ({ ...s, parallelWith: s.parallelWith && stepSet.has(s.parallelWith) ? s.parallelWith : undefined })),
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  // Il nome della sezione si sceglie senza contare gli elementi che ci finiscono dentro.
+  const others: Recipe = { ...recipe, ingredients: recipe.ingredients.filter((i) => !ingSet.has(i.id)), steps: recipe.steps.filter((s) => !stepSet.has(s.id)) }
+  const othersSections = sectionsOf(others)
+  const section = uniqueSection({ ...others, baseCopies: (recipe.baseCopies ?? []).filter((c) => othersSections.some((x) => inSection(x, c.section))) }, title)
+
+  const moved = withSections({
+    ...recipe,
+    ingredients: gather(recipe.ingredients, ingSet, (i) => ({ ...i, section })),
+    steps: gather(recipe.steps, stepSet, (s) => ({ ...s, section })),
+  })
+  const left = moved.sections ?? []
+  const kept = (recipe.baseCopies ?? []).filter((c) => c.section !== section && left.some((x) => inSection(x, c.section)))
+  const copy: BaseCopy = { section, baseId, baseVersion: baseFingerprint(base), quantity: { amount: 1, unit: '' }, prefix: '', copied: '' }
+  const out: Recipe = { ...moved, baseCopies: [...kept, copy], updatedAt: now }
+  copy.copied = sectionFingerprint(out, section)
+  return { base, recipe: out }
 }

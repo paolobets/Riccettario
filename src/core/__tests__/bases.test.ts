@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Recipe } from '../model'
-import { baseFingerprint, baseUsages, copyBaseInto, copyStatus, forgetBase, isBase, sectionFingerprint, setBase, updateBaseCopy, wouldCycle } from '../bases'
+import { baseFingerprint, baseUsages, defaultSelection, saveSelectionAsBase, copyBaseInto, copyStatus, forgetBase, isBase, sectionFingerprint, setBase, updateBaseCopy, wouldCycle } from '../bases'
 
 const now = '2026-01-01T00:00:00.000Z'
 const pasticcera: Recipe = {
@@ -235,5 +235,65 @@ describe('aggiornare le copie', () => {
     expect(f.baseCopies).toBeUndefined()
     expect(f.ingredients).toEqual(r.ingredients)
     expect(f.steps).toEqual(r.steps)
+  })
+})
+
+describe('salva come Base', () => {
+  const mista: Recipe = {
+    ...crostata,
+    id: 'mista',
+    title: 'Torta mista',
+    ingredients: [
+      { id: 'a', name: 'farina', quantity: { amount: 200, unit: 'g' } },
+      { id: 'latte', name: 'latte', quantity: { amount: 300, unit: 'g' } },
+      { id: 'b', name: 'burro', quantity: { amount: 100, unit: 'g' } },
+      { id: 'c', name: 'zucchero a velo', quantity: { amount: 50, unit: 'g' } },
+      { id: 'tuorli', name: 'tuorli', quantity: { amount: 3, unit: '' }, scaling: { mode: 'discrete' } },
+      { id: 'd', name: 'sale', quantity: { amount: 1, unit: 'q.b.' }, scaling: { mode: 'toTaste' } },
+    ],
+    steps: [
+      { id: 'p1', text: 'Impasta {a} e {b}' },
+      { id: 'p2', text: 'Scalda {latte}' },
+      { id: 'p3', text: 'Stendi' },
+      { id: 'p4', text: 'Inforna' },
+      { id: 'p5', text: 'Unisci {tuorli} al latte', parallelWith: 'p4' },
+      { id: 'p6', text: 'Farcisci con {latte|nome}' },
+    ],
+  }
+
+  it('selezione sparsa: Base con gli stessi id, ricetta raggruppata', () => {
+    const { base, recipe } = saveSelectionAsBase(mista, { ingredientIds: ['latte', 'tuorli'], stepIds: ['p2', 'p5'], title: 'Crema', baseId: 'crema' }, now)
+    expect(base).toMatchObject({ id: 'crema', title: 'Crema', tags: ['base'], servings: 8 })
+    expect(base.ingredients.map((i) => i.id)).toEqual(['latte', 'tuorli'])
+    expect(base.ingredients.every((i) => i.section === undefined)).toBe(true)
+    expect(base.steps.map((s) => s.id)).toEqual(['p2', 'p5'])
+    expect(base.steps[1]?.parallelWith).toBeUndefined()
+    expect(base.yield).toEqual({ amount: 300, unit: 'g' })
+
+    expect(recipe.ingredients.map((i) => i.id)).toEqual(['a', 'latte', 'tuorli', 'b', 'c', 'd'])
+    expect(recipe.ingredients.filter((i) => i.section === 'Crema').map((i) => i.id)).toEqual(['latte', 'tuorli'])
+    expect(recipe.steps.map((s) => s.id)).toEqual(['p1', 'p2', 'p5', 'p3', 'p4', 'p6'])
+    expect(recipe.steps.find((s) => s.id === 'p6')?.text).toBe('Farcisci con {latte|nome}')
+    expect(recipe.steps.find((s) => s.id === 'p5')?.parallelWith).toBe('p4')
+    expect(recipe.baseCopies).toEqual([expect.objectContaining({ section: 'Crema', baseId: 'crema', prefix: '', quantity: { amount: 1, unit: '' } })])
+    expect(copyStatus(recipe, recipe.baseCopies![0]!, base)).toBe('current')
+  })
+
+  it("una sezione intera salvata col suo nome non diventa «(2)»", () => {
+    const conSezione: Recipe = { ...mista, ingredients: mista.ingredients.map((i) => (i.id === 'latte' || i.id === 'tuorli' ? { ...i, section: 'Crema' } : i)), steps: mista.steps.map((s) => (s.id === 'p2' ? { ...s, section: 'Crema' } : s)) }
+    const sel = defaultSelection(conSezione, 'Crema')
+    expect(sel).toEqual({ ingredientIds: ['latte', 'tuorli'], stepIds: ['p2', 'p5', 'p6'] })
+    const { recipe } = saveSelectionAsBase(conSezione, { ...sel, title: 'Crema', baseId: 'crema' }, now)
+    expect(recipe.baseCopies?.[0]?.section).toBe('Crema')
+  })
+
+  it("da una copia modificata nasce una Base nuova e la vecchia origine sparisce", () => {
+    const r = copied()
+    const arancia: Recipe = { ...r, ingredients: [...r.ingredients, { id: 'scorza', name: "scorza d'arancia", quantity: { amount: 1, unit: 'pz' }, section: 'Pasticcera' }] }
+    const sel = defaultSelection(arancia, 'Pasticcera')
+    const { base, recipe } = saveSelectionAsBase(arancia, { ...sel, title: "Pasticcera all'arancia", baseId: 'pa' }, now)
+    expect(base.ingredients).toHaveLength(4)
+    expect(recipe.baseCopies?.map((c) => [c.section, c.baseId])).toEqual([["Pasticcera all'arancia", 'pa']])
+    expect(recipe.ingredients).toHaveLength(arancia.ingredients.length)
   })
 })
