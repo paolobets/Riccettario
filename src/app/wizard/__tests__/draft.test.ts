@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Recipe } from '@/core'
+import { copyBaseInto, sectionFingerprint } from '@/core/bases'
 import { fromRecipe, toRecipe } from '../draft'
 
 function recipe(over: Partial<Recipe> = {}): Recipe {
@@ -48,5 +49,27 @@ describe('bozza del wizard', () => {
     d.steps = d.steps.map((s) => ({ ...s, section: s.section === 'Crema' ? '' : s.section }))
     expect(toRecipe(d, r).baseCopies).toBeUndefined()
     expect(toRecipe(fromRecipe(r), r).baseCopies).toEqual([copy])
+  })
+
+  it("andata e ritorno non cambia l'impronta di una copia", () => {
+    const base: Recipe = {
+      ...recipe(),
+      id: 'b',
+      title: 'Crema',
+      yield: { amount: 600, unit: 'g' },
+      ingredients: [
+        { id: 'latte', name: 'latte', quantity: { amount: 500, unit: 'ml' } },
+        { id: 'tuorli', name: 'tuorli', quantity: { amount: 4, unit: '' }, scaling: { mode: 'discrete', step: 2, rounding: 'ceil' } },
+        { id: 'sale', name: 'sale', quantity: { amount: 1, unit: 'q.b.' }, scaling: { mode: 'toTaste' } },
+        { id: 'vaniglia', name: 'vaniglia', quantity: { amount: 1, unit: 'g' }, scaling: { mode: 'sublinear', exponent: 0.7 } },
+      ],
+      steps: [{ id: 's1', text: 'Scalda {latte}', equipment: ['pentolino'], timer: { minutes: 5 } }],
+    }
+    const res = copyBaseInto({ ...recipe(), ingredients: [], steps: [] }, base, { amount: 300, unit: 'g' })
+    if (!res.ok) throw new Error(res.problem)
+    const r = res.recipe
+    const again = toRecipe(fromRecipe(r), r)
+    expect(sectionFingerprint(again, 'Crema')).toBe(sectionFingerprint(r, 'Crema'))
+    expect(again.ingredients.find((i) => i.id === 'crema-tuorli')?.scaling).toEqual({ mode: 'discrete', step: 2, rounding: 'ceil' })
   })
 })

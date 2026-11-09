@@ -95,6 +95,7 @@ export function num(s: string): number | undefined {
  * wizard non gestisce (etichetta, preferito, ...) restano com'erano.
  */
 export function toRecipe(d: Draft, original: Recipe): Recipe {
+  const originalById = new Map(original.ingredients.map((i) => [i.id, i]))
   const ingredients: Ingredient[] = d.ingredients
     .filter((i) => i.name.trim())
     .map((i) => {
@@ -107,8 +108,11 @@ export function toRecipe(d: Draft, original: Recipe): Recipe {
         case 'bakersPercent':
           scaling = { mode: 'bakersPercent', percent: num(i.percent) ?? 0, of: i.of }
           break
-        default:
-          scaling = { mode: i.mode } as ScalingRule
+        default: {
+          // La bozza non mostra passo, arrotondamento ed esponente: se la regola non cambia si tiene quella originale.
+          const prev = originalById.get(i.id)?.scaling
+          scaling = prev?.mode === i.mode ? prev : ({ mode: i.mode } as ScalingRule)
+        }
       }
       const unit: Unit = i.mode === 'toTaste' ? 'q.b.' : i.unit
       return {

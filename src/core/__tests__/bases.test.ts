@@ -1,0 +1,159 @@
+import { describe, expect, it } from 'vitest'
+import type { Recipe } from '../model'
+import { baseFingerprint, copyBaseInto, isBase, sectionFingerprint, setBase, wouldCycle } from '../bases'
+
+const now = '2026-01-01T00:00:00.000Z'
+const pasticcera: Recipe = {
+  id: 'pasticcera',
+  title: 'Pasticcera',
+  servings: 1,
+  yield: { amount: 600, unit: 'g' },
+  tags: ['base'],
+  ingredients: [
+    { id: 'latte', name: 'latte', quantity: { amount: 500, unit: 'g' } },
+    { id: 'tuorli', name: 'tuorli', quantity: { amount: 4, unit: '' }, scaling: { mode: 'discrete' } },
+    { id: 'zucchero', name: 'zucchero', quantity: { amount: 150, unit: 'g' } },
+  ],
+  steps: [
+    { id: 's1', text: 'Scalda {latte}.' },
+    { id: 's2', text: 'Sbatti {tuorli} con {zucchero} e unisci al latte.', durationMin: 10 },
+  ],
+  createdAt: now,
+  updatedAt: now,
+}
+const crostata: Recipe = {
+  id: 'crostata',
+  title: 'Crostata',
+  servings: 8,
+  tags: [],
+  ingredients: [
+    { id: 'frolla', name: 'frolla', quantity: { amount: 400, unit: 'g' } },
+    { id: 'crema', name: 'crema pasticcera', quantity: { amount: 300, unit: 'g' } },
+  ],
+  steps: [{ id: 'f1', text: 'Farcisci con {crema}' }],
+  createdAt: now,
+  updatedAt: now,
+}
+
+function copied(r: Recipe = crostata) {
+  const res = copyBaseInto(r, pasticcera, { amount: 300, unit: 'g' }, { replaceIngredientId: 'crema' })
+  if (!res.ok) throw new Error(res.problem)
+  return res.recipe
+}
+
+describe('copiare una Base', () => {
+  it('copia a metà dose sostituendo la riga', () => {
+    const r = copied()
+    expect(r.ingredients.map((i) => i.id)).toEqual(['frolla', 'pasticcera-latte', 'pasticcera-tuorli', 'pasticcera-zucchero'])
+    expect(r.ingredients.find((i) => i.id === 'pasticcera-latte')).toMatchObject({ name: 'latte', quantity: { amount: 250, unit: 'g' }, section: 'Pasticcera' })
+    expect(r.ingredients.find((i) => i.id === 'pasticcera-zucchero')?.quantity).toEqual({ amount: 75, unit: 'g' })
+    expect(r.ingredients.find((i) => i.id === 'pasticcera-tuorli')).toMatchObject({ quantity: { amount: 2, unit: '' }, scaling: { mode: 'discrete' } })
+    expect(r.steps.map((s) => s.id)).toEqual(['pasticcera-s1', 'pasticcera-s2', 'f1'])
+    expect(r.steps[0]).toMatchObject({ text: 'Scalda {pasticcera-latte}.', section: 'Pasticcera' })
+    expect(r.steps[2]?.text).toBe('Farcisci con crema pasticcera')
+    expect(r.baseCopies).toEqual([
+      { section: 'Pasticcera', baseId: 'pasticcera', baseVersion: baseFingerprint(pasticcera), quantity: { amount: 300, unit: 'g' }, prefix: 'pasticcera', copied: sectionFingerprint(r, 'Pasticcera') },
+    ])
+    expect(r.sections).toEqual(['Pasticcera'])
+  })
+
+  it('aggiunge in coda e mette i passaggi della Base per primi', () => {
+    const res = copyBaseInto(crostata, pasticcera, { amount: 1, unit: '' })
+    if (!res.ok) throw new Error(res.problem)
+    expect(res.recipe.ingredients.map((i) => i.id)).toEqual(['frolla', 'crema', 'pasticcera-latte', 'pasticcera-tuorli', 'pasticcera-zucchero'])
+    expect(res.recipe.ingredients[2]?.quantity).toEqual({ amount: 500, unit: 'g' })
+    expect(res.recipe.steps.map((s) => s.id)).toEqual(['pasticcera-s1', 'pasticcera-s2', 'f1'])
+    expect(res.recipe.steps[2]?.text).toBe('Farcisci con {crema}')
+  })
+
+  it('la stessa Base due volte', () => {
+    const once = copied()
+    const res = copyBaseInto(once, pasticcera, { amount: 600, unit: 'g' })
+    if (!res.ok) throw new Error(res.problem)
+    const r = res.recipe
+    expect(r.baseCopies?.map((c) => [c.section, c.prefix])).toEqual([
+      ['Pasticcera', 'pasticcera'],
+      ['Pasticcera (2)', 'pasticcera-2'],
+    ])
+    const ids = [...r.ingredients.map((i) => i.id), ...r.steps.map((s) => s.id)]
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(r.steps.map((s) => s.id)).toEqual(['pasticcera-s1', 'pasticcera-s2', 'pasticcera-2-s1', 'pasticcera-2-s2', 'f1'])
+    expect(r.ingredients.find((i) => i.id === 'pasticcera-2-latte')?.section).toBe('Pasticcera (2)')
+  })
+
+  it('rifiuta una quantità non utilizzabile', () => {
+    const qb = copyBaseInto(crostata, pasticcera, { amount: 1, unit: 'q.b.' })
+    expect(qb.ok).toBe(false)
+    const senzaResa = copyBaseInto(crostata, { ...pasticcera, yield: undefined }, { amount: 300, unit: 'g' })
+    expect(senzaResa.ok).toBe(false)
+    if (!senzaResa.ok) expect(senzaResa.problem).toContain('Pasticcera')
+  })
+
+  it('sezioni interne della Base prendono un nome composto', () => {
+    const conSezioni: Recipe = {
+      ...pasticcera,
+      id: 'pronta',
+      title: 'Crostata pronta',
+      ingredients: pasticcera.ingredients.map((i) => ({ ...i, section: 'Crema' })),
+      steps: pasticcera.steps.map((s) => ({ ...s, section: 'Crema' })),
+    }
+    const res = copyBaseInto(crostata, conSezioni, { amount: 1, unit: '' })
+    if (!res.ok) throw new Error(res.problem)
+    expect(res.recipe.ingredients[2]?.section).toBe('Crostata pronta: Crema')
+    expect(res.recipe.baseCopies?.[0]?.section).toBe('Crostata pronta')
+  })
+
+  it('riscrive anche percentuali del panettiere e passaggi in parallelo', () => {
+    const base: Recipe = {
+      ...pasticcera,
+      ingredients: [...pasticcera.ingredients, { id: 'amido', name: 'amido', quantity: { amount: 40, unit: 'g' }, scaling: { mode: 'bakersPercent', percent: 8, of: 'latte' } }],
+      steps: [...pasticcera.steps, { id: 's3', text: 'Raffredda', parallelWith: 's2' }],
+    }
+    const res = copyBaseInto(crostata, base, { amount: 1, unit: '' })
+    if (!res.ok) throw new Error(res.problem)
+    expect(res.recipe.ingredients.find((i) => i.id === 'pasticcera-amido')?.scaling).toEqual({ mode: 'bakersPercent', percent: 8, of: 'pasticcera-latte' })
+    expect(res.recipe.steps.find((s) => s.id === 'pasticcera-s3')?.parallelWith).toBe('pasticcera-s2')
+  })
+})
+
+describe('impronte', () => {
+  it('ignora stringhe e liste vuote', () => {
+    const r = copied()
+    const sporca: Recipe = {
+      ...r,
+      ingredients: r.ingredients.map((i) => ({ ...i, note: '', optional: false })),
+      steps: r.steps.map((s) => ({ ...s, equipment: [] })),
+    }
+    expect(sectionFingerprint(sporca, 'Pasticcera')).toBe(sectionFingerprint(r, 'Pasticcera'))
+  })
+
+  it('cambia se cambia un ingrediente della sezione', () => {
+    const r = copied()
+    const mod: Recipe = { ...r, ingredients: r.ingredients.map((i) => (i.id === 'pasticcera-zucchero' ? { ...i, quantity: { amount: 80, unit: 'g' as const } } : i)) }
+    expect(sectionFingerprint(mod, 'Pasticcera')).not.toBe(sectionFingerprint(r, 'Pasticcera'))
+    expect(baseFingerprint({ ...pasticcera, yield: { amount: 700, unit: 'g' } })).not.toBe(baseFingerprint(pasticcera))
+  })
+
+  it('non cambia per ingredienti fuori sezione', () => {
+    const r = copied()
+    const mod: Recipe = { ...r, ingredients: r.ingredients.map((i) => (i.id === 'frolla' ? { ...i, quantity: { amount: 500, unit: 'g' as const } } : i)) }
+    expect(sectionFingerprint(mod, 'Pasticcera')).toBe(sectionFingerprint(r, 'Pasticcera'))
+  })
+})
+
+describe('Basi', () => {
+  it('si segnano col tag base', () => {
+    expect(isBase(pasticcera)).toBe(true)
+    expect(isBase(crostata)).toBe(false)
+    expect(setBase(crostata, true).tags).toEqual(['base'])
+    expect(isBase(setBase(pasticcera, false))).toBe(false)
+  })
+
+  it('wouldCycle segue le copie', () => {
+    const A: Recipe = { ...pasticcera, id: 'A', baseCopies: [{ section: 'B', baseId: 'B', baseVersion: '', quantity: { amount: 1, unit: '' }, prefix: 'b', copied: '' }] }
+    const B: Recipe = { ...pasticcera, id: 'B' }
+    expect(wouldCycle([A, B], 'B', 'A')).toBe(true)
+    expect(wouldCycle([A, B], 'X', 'A')).toBe(false)
+    expect(wouldCycle([A, B], 'A', 'A')).toBe(true)
+  })
+})
