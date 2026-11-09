@@ -146,6 +146,21 @@ export interface LabelInfo {
   showStatement?: boolean
 }
 
+/** Origine di una sezione copiata da una Base (vedi `src/core/bases.ts`). */
+export interface BaseCopy {
+  /** Nome della sezione nella ricetta ("Pasticcera", "Pasticcera (2)"). */
+  section: string
+  baseId: string
+  /** Impronta del contenuto della Base al momento della copia (baseFingerprint). */
+  baseVersion: string
+  /** Quantità chiesta: 300 g, oppure 2 dosi ({ amount: 2, unit: '' }). */
+  quantity: Quantity
+  /** Prefisso degli id copiati; '' quando gli id sono quelli della Base (Salva come Base). */
+  prefix: string
+  /** Impronta della sezione appena copiata (sectionFingerprint), per capire se è stata modificata. */
+  copied: string
+}
+
 export interface Recipe {
   id: string
   title: string
@@ -165,6 +180,8 @@ export interface Recipe {
   sections?: string[]
   ingredients: Ingredient[]
   steps: Step[]
+  /** Sezioni copiate da una Base, con la loro origine. */
+  baseCopies?: BaseCopy[]
   notes?: string
   source?: string
   createdAt: string
