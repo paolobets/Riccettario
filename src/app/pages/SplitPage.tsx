@@ -17,6 +17,7 @@ export default function SplitPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const recipe = useLiveQuery(async () => (id ? ((await db.recipes.get(id)) ?? null) : null), [id])
+  const titles = useLiveQuery(async () => (await db.recipes.toArray()).map((r) => r.title.trim().toLowerCase()), [])
   const [title, setTitle] = useState('')
   const [ingredientIds, setIngredientIds] = useState<Set<string>>(new Set())
   const [stepIds, setStepIds] = useState<Set<string>>(new Set())
@@ -42,6 +43,7 @@ export default function SplitPage() {
     return next
   }
   const canSave = ingredientIds.size > 0 && title.trim().length > 0
+  const sameTitle = Boolean(title.trim()) && (titles ?? []).includes(title.trim().toLowerCase())
 
   const save = async () => {
     setBusy(true)
@@ -67,8 +69,19 @@ export default function SplitPage() {
       )}
       <label className="block text-sm">
         <span className="mb-1 block font-medium text-fg-2">Nome della Base</span>
-        <input className="w-full" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Crema al mascarpone" />
+        <input
+          className="w-full"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Crema al mascarpone"
+          aria-describedby={sameTitle ? 'same-title' : undefined}
+        />
       </label>
+      {sameTitle && (
+        <p id="same-title" className="text-sm text-warning">
+          C'è già una ricetta che si chiama «{title.trim()}»: dai un nome diverso, così le distingui.
+        </p>
+      )}
       <section className="space-y-1">
         <h2 className="section-title text-lg">Ingredienti della Base</h2>
         <ul className="divide-y divide-line">

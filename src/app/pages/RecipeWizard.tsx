@@ -143,7 +143,7 @@ export default function RecipeWizard() {
       {prefill.fromAi && (
         // Resta montata anche nelle altre fasi, così la conversazione non si perde.
         <div className={phase === 3 ? '' : 'hidden'}>
-          <ImportReviewChat recipe={toRecipe(draft, original)} source={prefill.source} onReplace={(r) => set(fromRecipe(r))} />
+          <ImportReviewChat recipe={toRecipe(draft, original)} source={prefill.source} onReplace={(r) => set(fromRecipe({ ...r, baseCopies: r.baseCopies ?? toRecipe(draft, original).baseCopies }))} />
         </div>
       )}
       {phase === 3 && <PhaseReview recipe={toRecipe(draft, original)} />}
@@ -298,7 +298,12 @@ function PhaseIngredients({ draft, set, original, recipes }: { draft: Draft; set
     setBaseProblem(null)
     setBaseDialog(null)
     const next = fromRecipe(res.recipe)
-    set({ ingredients: next.ingredients, steps: next.steps, baseCopies: next.baseCopies })
+    // Le righe ancora vuote (nome o testo da scrivere) non passano dalla ricetta: si rimettono in fondo.
+    set({
+      ingredients: [...next.ingredients, ...draft.ingredients.filter((i) => !i.name.trim())],
+      steps: [...next.steps, ...draft.steps.filter((s) => !s.text.trim())],
+      baseCopies: next.baseCopies,
+    })
   }
   const copyOf = (section: string) => draft.baseCopies.find((c) => c.section === section)
   const baseTitle = (baseId: string) => recipes.find((r) => r.id === baseId)?.title
@@ -433,6 +438,7 @@ function PhaseIngredients({ draft, set, original, recipes }: { draft: Draft; set
           recipes={recipes}
           currentId={original.id}
           initial={baseDialog.replace ? draftQuantity(baseDialog.replace) : undefined}
+          replacing={Boolean(baseDialog.replace)}
           title={baseDialog.replace ? `Sostituisci «${baseDialog.replace.name}» con una Base` : 'Aggiungi una Base'}
           onPick={copyBase}
           onClose={() => {

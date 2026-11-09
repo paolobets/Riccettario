@@ -47,6 +47,30 @@ export function baseFactor(q: Quantity | undefined, base: Recipe): BaseFactor {
   return { factor: null, problem: 'Una Base si misura in grammi, millilitri o dosi.' }
 }
 
+/** Unità con cui si può misurare una Base: quelle della sua resa, più le dosi (unità vuota). */
+export function baseUnits(base: Recipe): Unit[] {
+  const y = base.yield?.unit as Unit | undefined
+  if (y && isMassUnit(y)) return ['g', 'kg', '']
+  if (y && isVolumeUnit(y)) return ['ml', 'l', '']
+  return ['']
+}
+
+/**
+ * Quantità da proporre nel dialogo delle Basi. Sostituendo una riga si propone
+ * la sua quantità se si può usare ("pz" vale come dosi); se non si può, il campo
+ * resta vuoto e la quantità si chiede. Aggiungendo, si propone la resa intera.
+ */
+export function pickerQuantity(base: Recipe, initial: Quantity | undefined, replacing: boolean): { amount: string; unit: Unit } {
+  const units = baseUnits(base)
+  const q = initial && initial.unit === 'pz' ? { amount: initial.amount, unit: '' as Unit } : initial
+  if (q && units.includes(q.unit) && baseFactor(q, base).factor !== null) return { amount: String(q.amount), unit: q.unit }
+  const y = base.yield?.unit as Unit | undefined
+  const unit = units[0]!
+  if (replacing) return { amount: '', unit }
+  if (base.yield && y && units.includes(y)) return { amount: String(base.yield.amount), unit: y }
+  return { amount: '1', unit }
+}
+
 // --- Impronte ----------------------------------------------------------------
 
 /** FNV-1a a 32 bit, in esadecimale. */
@@ -92,7 +116,11 @@ function normStep(s: Step, id: (x: string) => string, section: (x: string | unde
   }
 }
 
-/** JSON con le chiavi `undefined` omesse: uguale per `{}` e `{ x: undefined }`. */
+/**
+ * JSON degli oggetti normalizzati. Le chiavi `undefined` spariscono, quindi `{}` e
+ * `{ x: undefined }` danno lo stesso testo; l'ordine delle chiavi è fisso perché
+ * gli oggetti li costruiscono sempre `normIngredient` e `normStep`.
+ */
 function stable(v: unknown): string {
   return JSON.stringify(v)
 }
@@ -246,7 +274,10 @@ export function copyBaseInto(recipe: Recipe, base: Recipe, quantity: Quantity, o
   const prefix = uniquePrefix(recipe, base)
   const parts = copiedParts(base, factor, prefix, section)
 
-  const ingredients = recipe.ingredients.filter((i) => i !== replaced)
+  // Una percentuale del panettiere sulla riga tolta non ha più una base: l'ingrediente torna lineare.
+  const ingredients = recipe.ingredients
+    .filter((i) => i !== replaced)
+    .map((i) => (replaced && i.scaling?.mode === 'bakersPercent' && i.scaling.of === replaced.id ? { ...i, scaling: undefined } : i))
   const at = replaced ? recipe.ingredients.indexOf(replaced) : ingredients.length
   ingredients.splice(at, 0, ...parts.ingredients)
 
@@ -313,14 +344,27 @@ export function updateBaseCopy(recipe: Recipe, section: string, base: Recipe): C
   const ingAt = recipe.ingredients.findIndex((i) => inside(i.section))
   const stepAt = recipe.steps.findIndex((s) => inside(s.section))
 
-  const ingredients = recipe.ingredients.filter((i) => !inside(i.section))
-  ingredients.splice(ingAt >= 0 ? ingAt : ingredients.length, 0, ...parts.ingredients)
+  const outside = recipe.ingredients.filter((i) => !inside(i.section))
+  const outsideSteps = recipe.steps.filter((s) => !inside(s.section))
+  const outsideIds = new Set([...outside.map((i) => i.id), ...outsideSteps.map((s) => s.id)])
+  const clash = [...parts.ingredients, ...parts.steps].find((x) => outsideIds.has(x.id))
+  if (clash) {
+    const what = 'name' in clash ? `«${clash.name}»` : `il passaggio «${clash.text.slice(0, 30)}»`
+    return { ok: false, problem: `La versione nuova ha ${what} con lo stesso codice di un elemento fuori dalla sezione: rinominalo nella ricetta e riprova.` }
+  }
 
   const newIds = new Set(parts.ingredients.map((i) => i.id))
+  const newStepIds = new Set(parts.steps.map((s) => s.id))
   const gone = new Map(oldIngredients.filter((i) => !newIds.has(i.id)).map((i) => [i.id, i.name]))
-  const steps = recipe.steps
-    .filter((s) => !inside(s.section))
-    .map((s) => ({ ...s, text: s.text.replace(REF, (m, ref: string) => gone.get(ref) ?? m) }))
+  const oldStepIds = new Set(recipe.steps.filter((s) => inside(s.section)).map((s) => s.id))
+  // Fuori dalla sezione nulla deve puntare a ciò che la versione nuova ha tolto.
+  const ingredients = outside.map((i) => (i.scaling?.mode === 'bakersPercent' && gone.has(i.scaling.of) ? { ...i, scaling: undefined } : i))
+  ingredients.splice(ingAt >= 0 ? ingAt : ingredients.length, 0, ...parts.ingredients)
+  const steps: Step[] = outsideSteps.map((s) => ({
+    ...s,
+    text: s.text.replace(REF, (m, ref: string) => gone.get(ref) ?? m),
+    parallelWith: s.parallelWith && oldStepIds.has(s.parallelWith) && !newStepIds.has(s.parallelWith) ? undefined : s.parallelWith,
+  }))
   steps.splice(stepAt >= 0 ? stepAt : stepInsertIndex(recipe), 0, ...parts.steps)
 
   const next = withSections({ ...recipe, ingredients, steps })

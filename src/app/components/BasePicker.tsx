@@ -1,37 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { baseFactor, isBase, isMassUnit, isVolumeUnit, wouldCycle, type Quantity, type Recipe, type Unit } from '@/core'
+import { baseFactor, baseUnits, isBase, pickerQuantity, wouldCycle, type Quantity, type Recipe, type Unit } from '@/core'
 import Icon from './Icon'
 
 interface Props {
   recipes: Recipe[]
   /** La ricetta in cui si copia: esclusa dall'elenco, insieme alle Basi che la contengono. */
   currentId: string
-  /** Quantità proposta (quella della riga da sostituire). */
+  /** Quantità della riga da sostituire. */
   initial?: Quantity
+  /** Vero se si sta sostituendo una riga: senza una quantità usabile il campo resta vuoto e la si chiede. */
+  replacing?: boolean
   /** Titolo del dialogo: "Aggiungi una Base" o "Sostituisci «crema» con una Base". */
   title: string
   onPick: (base: Recipe, quantity: Quantity) => void
   onClose: () => void
 }
 
-/** Unità con cui si può misurare una Base: quelle della sua resa, più le dosi. */
-function unitsFor(base: Recipe): Unit[] {
-  const y = base.yield?.unit as Unit | undefined
-  if (y && isMassUnit(y)) return ['g', 'kg', '']
-  if (y && isVolumeUnit(y)) return ['ml', 'l', '']
-  return ['']
-}
-
-function startQuantity(base: Recipe, initial: Quantity | undefined): { amount: string; unit: Unit } {
-  if (initial && unitsFor(base).includes(initial.unit) && baseFactor(initial, base).factor !== null) return { amount: String(initial.amount), unit: initial.unit }
-  const y = base.yield?.unit as Unit | undefined
-  if (base.yield && y && (isMassUnit(y) || isVolumeUnit(y))) return { amount: String(base.yield.amount), unit: y }
-  return { amount: '1', unit: '' }
-}
-
 /** Dialogo per scegliere una Base e quanta copiarne. */
-export default function BasePicker({ recipes, currentId, initial, title, onPick, onClose }: Props) {
+export default function BasePicker({ recipes, currentId, initial, replacing = false, title, onPick, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   const [query, setQuery] = useState('')
   const [chosen, setChosen] = useState<Recipe | null>(null)
@@ -53,7 +40,7 @@ export default function BasePicker({ recipes, currentId, initial, title, onPick,
   )
   const choose = (b: Recipe) => {
     setChosen(b)
-    const q = startQuantity(b, initial)
+    const q = pickerQuantity(b, initial, replacing)
     setAmount(q.amount)
     setUnit(q.unit)
   }
@@ -126,7 +113,7 @@ export default function BasePicker({ recipes, currentId, initial, title, onPick,
               onChange={(e) => setAmount(e.target.value)}
             />
             <select aria-label="Unità" value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
-              {unitsFor(chosen).map((u) => (
+              {baseUnits(chosen).map((u) => (
                 <option key={u} value={u}>
                   {u === '' ? 'dosi' : u}
                 </option>

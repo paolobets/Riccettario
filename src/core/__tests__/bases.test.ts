@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Recipe } from '../model'
-import { baseFingerprint, baseUsages, defaultSelection, saveSelectionAsBase, copyBaseInto, copyStatus, forgetBase, isBase, sectionFingerprint, setBase, updateBaseCopy, wouldCycle } from '../bases'
+import { baseUnits, pickerQuantity, baseFingerprint, baseUsages, defaultSelection, saveSelectionAsBase, copyBaseInto, copyStatus, forgetBase, isBase, sectionFingerprint, setBase, updateBaseCopy, wouldCycle } from '../bases'
 
 const now = '2026-01-01T00:00:00.000Z'
 const pasticcera: Recipe = {
@@ -143,6 +143,55 @@ describe('sezioni con i due punti nel nome', () => {
     const l = res.recipe.baseCopies!.find((x) => x.baseId === 'light')!
     expect(copyStatus(res.recipe, l, light)).toBe('current')
   })
+})
+
+describe('ritocchi', () => {
+  it('il dialogo propone la quantità giusta', () => {
+    const senzaResa: Recipe = { ...pasticcera, yield: undefined }
+    // "2 pz" su una Base a dosi: 2 dosi
+    expect(pickerQuantity(senzaResa, { amount: 2, unit: 'pz' }, true)).toEqual({ amount: '2', unit: '' })
+    // riga senza quantità usabile su una Base a grammi: niente precompilato, si chiede
+    expect(pickerQuantity(pasticcera, undefined, true)).toEqual({ amount: '', unit: 'g' })
+    expect(pickerQuantity(pasticcera, { amount: 1, unit: 'q.b.' }, true)).toEqual({ amount: '', unit: 'g' })
+    // riga in grammi: quella quantità
+    expect(pickerQuantity(pasticcera, { amount: 300, unit: 'g' }, true)).toEqual({ amount: '300', unit: 'g' })
+    // aggiungendo senza riga: la resa intera
+    expect(pickerQuantity(pasticcera, undefined, false)).toEqual({ amount: '600', unit: 'g' })
+    expect(baseUnits(pasticcera)).toEqual(['g', 'kg', ''])
+  })
+
+  it('sostituire una riga toglie le percentuali che la usavano come base', () => {
+    const r: Recipe = { ...crostata, ingredients: [...crostata.ingredients, { id: 'rum', name: 'rum', quantity: { amount: 15, unit: 'g' }, scaling: { mode: 'bakersPercent', percent: 5, of: 'crema' } }] }
+    const res = copyBaseInto(r, pasticcera, { amount: 300, unit: 'g' }, { replaceIngredientId: 'crema' })
+    if (!res.ok) throw new Error(res.problem)
+    const rum = res.recipe.ingredients.find((i) => i.id === 'rum')!
+    expect(rum.scaling).toBeUndefined()
+    expect(rum.quantity).toEqual({ amount: 15, unit: 'g' })
+  })
+
+  it('aggiornare pulisce paralleli e percentuali esterne verso elementi tolti', () => {
+    const r = copied()
+    const conRif: Recipe = {
+      ...r,
+      ingredients: [...r.ingredients, { id: 'rum', name: 'rum', quantity: { amount: 15, unit: 'g' }, scaling: { mode: 'bakersPercent', percent: 5, of: 'pasticcera-tuorli' } }],
+      steps: [...r.steps, { id: 'f2', text: 'Raffredda', parallelWith: 'pasticcera-s2' }],
+    }
+    const ridotta: Recipe = { ...pasticcera, ingredients: pasticcera.ingredients.filter((i) => i.id !== 'tuorli'), steps: [{ id: 's1', text: 'Scalda {latte} con {zucchero}.' }] }
+    const res = updateBaseCopy(conRif, 'Pasticcera', ridotta)
+    if (!res.ok) throw new Error(res.problem)
+    expect(res.recipe.ingredients.find((i) => i.id === 'rum')?.scaling).toBeUndefined()
+    expect(res.recipe.steps.find((s) => s.id === 'f2')?.parallelWith).toBeUndefined()
+  })
+
+  it("aggiornare non crea id doppi se un id nuovo c'è già fuori dalla sezione", () => {
+    const r = copied()
+    const conPanna: Recipe = { ...r, ingredients: [...r.ingredients, { id: 'pasticcera-panna', name: 'panna', quantity: { amount: 100, unit: 'g' } }] }
+    const conPannaBase: Recipe = { ...pasticcera, ingredients: [...pasticcera.ingredients, { id: 'panna', name: 'panna', quantity: { amount: 100, unit: 'g' } }] }
+    const res = updateBaseCopy(conPanna, 'Pasticcera', conPannaBase)
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.problem).toContain('panna')
+  })
+
 })
 
 describe('impronte', () => {
